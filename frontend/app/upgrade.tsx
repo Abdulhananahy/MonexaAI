@@ -1,15 +1,33 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import api from '../utils/api';
 
 export default function UpgradeScreen() {
   const router = useRouter();
   const isWeb = Platform.OS === 'web';
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro'>('pro');
+  const [loading, setLoading] = useState(false);
+  const [publishableKey, setPublishableKey] = useState('');
+
+  useEffect(() => {
+    loadStripeConfig();
+  }, []);
+
+  const loadStripeConfig = async () => {
+    try {
+      const response = await api.get('/subscription/config');
+      setPublishableKey(response.data.publishable_key);
+    } catch (error) {
+      console.error('Failed to load Stripe config:', error);
+    }
+  };
 
   const plans = [
     {
-      id: 'starter',
+      id: 'starter' as const,
       name: 'Starter',
       price: 3,
       features: [
@@ -21,7 +39,7 @@ export default function UpgradeScreen() {
       ],
     },
     {
-      id: 'pro',
+      id: 'pro' as const,
       name: 'Pro',
       price: 9,
       popular: true,
@@ -36,17 +54,57 @@ export default function UpgradeScreen() {
     },
   ];
 
-  const handleSubscribe = () => {
+  const handleWebCheckout = async () => {
+    if (!publishableKey) {
+      Alert.alert('Error', 'Payment system not configured. Please try again later.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // For web, we'll create a Stripe Checkout session
+      const response = await api.post('/subscription/create-checkout-session', {
+        plan_type: selectedPlan,
+        success_url: window.location.origin + '/payment-success',
+        cancel_url: window.location.origin + '/upgrade',
+      });
+
+      if (response.data.checkout_url) {
+        // Redirect to Stripe Checkout
+        window.location.href = response.data.checkout_url;
+      }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to start checkout process');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMobilePayment = () => {
+    Alert.alert(
+      'Mobile Payment',
+      'Stripe payment integration for React Native requires the Stripe SDK which is native-only. For now, please use the web version to subscribe, or contact support.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Contact Support',
+          onPress: () => {
+            const email = 'support@monexa.app';
+            const subject = 'Mobile Subscription Help';
+            const body = `I would like to subscribe to the ${selectedPlan} plan from the mobile app.`;
+            Linking.openURL(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSubscribe = async () => {
     if (isWeb) {
-      Alert.alert(
-        'Mobile Only',
-        'Payment and subscriptions are only available on the Monexa mobile app. Please download our mobile app to upgrade your account.'
-      );
+      await handleWebCheckout();
     } else {
-      Alert.alert(
-        'Coming Soon',
-        'Payment integration coming soon! You will be able to subscribe directly from the app.'
-      );
+      handleMobilePayment();
     }
   };
 
@@ -74,9 +132,10 @@ export default function UpgradeScreen() {
                 key={plan.id}
                 style={[
                   styles.planCard,
+                  selectedPlan === plan.id && styles.selectedPlanCard,
                   plan.popular && styles.popularPlan,
                 ]}
-                onPress={handleSubscribe}
+                onPress={() => setSelectedPlan(plan.id)}
               >
                 {plan.popular && (
                   <View style={styles.popularBadge}>
@@ -84,7 +143,14 @@ export default function UpgradeScreen() {
                   </View>
                 )}
                 <View style={styles.planHeader}>
-                  <Text style={styles.planName}>{plan.name}</Text>
+                  <View style={styles.planNameRow}>
+                    <Text style={styles.planName}>{plan.name}</Text>
+                    {selectedPlan === plan.id && (
+                      <View style={styles.selectedIndicator}>
+                        <Ionicons name="checkmark-circle" size={24} color="#D32F2F" />
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.priceContainer}>
                     <Text style={styles.currency}>$</Text>
                     <Text style={styles.price}>{plan.price}</Text>
@@ -94,35 +160,47 @@ export default function UpgradeScreen() {
                 <View style={styles.featuresContainer}>
                   {plan.features.map((feature, idx) => (
                     <View key={idx} style={styles.featureItem}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color="#10B981"
-                      />
+                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                       <Text style={styles.featureText}>{feature}</Text>
                     </View>
                   ))}
                 </View>
-                <TouchableOpacity
-                  style={styles.selectButton}
-                  onPress={handleSubscribe}
-                >
-                  <Text style={styles.selectButtonText}>
-                    {isWeb ? 'Get Mobile App' : 'Select Plan'}
-                  </Text>
-                </TouchableOpacity>
               </TouchableOpacity>
             ))}
           </View>
 
-          {isWeb && (
+          {!isWeb && (
             <View style={styles.webNotice}>
               <Ionicons name="information-circle" size={24} color="#D32F2F" />
               <Text style={styles.webNoticeText}>
-                Payment and subscriptions are only available on the mobile app. Please download the Monexa mobile app to upgrade your account.
+                For the best payment experience, please use the web version at monexa.app or contact support to subscribe.
               </Text>
             </View>
           )}
+
+          <TouchableOpacity
+            style={[styles.subscribeButton, loading && styles.subscribeButtonDisabled]}
+            onPress={handleSubscribe}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="card" size={20} color="#FFFFFF" />
+                <Text style={styles.subscribeButtonText}>
+                  {isWeb ? 'Subscribe Now' : 'Contact Support'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.securityBadge}>
+            <Ionicons name="shield-checkmark" size={20} color="#10B981" />
+            <Text style={styles.securityText}>
+              Secured by Stripe • Cancel anytime • No hidden fees
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -180,9 +258,12 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: '#FFFFFF',
   },
-  popularPlan: {
+  selectedPlanCard: {
     borderColor: '#D32F2F',
     backgroundColor: '#FEF2F2',
+  },
+  popularPlan: {
+    borderColor: '#D32F2F',
   },
   popularBadge: {
     position: 'absolute',
@@ -201,11 +282,19 @@ const styles = StyleSheet.create({
   planHeader: {
     marginBottom: 24,
   },
+  planNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   planName: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 8,
+  },
+  selectedIndicator: {
+    marginLeft: 8,
   },
   priceContainer: {
     flexDirection: 'row',
@@ -228,7 +317,6 @@ const styles = StyleSheet.create({
   },
   featuresContainer: {
     gap: 12,
-    marginBottom: 24,
   },
   featureItem: {
     flexDirection: 'row',
@@ -240,17 +328,6 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     flex: 1,
   },
-  selectButton: {
-    backgroundColor: '#D32F2F',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  selectButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   webNotice: {
     flexDirection: 'row',
     gap: 12,
@@ -258,6 +335,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginTop: 32,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#FEE2E2',
   },
@@ -266,5 +344,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1F2937',
     lineHeight: 20,
+  },
+  subscribeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#D32F2F',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: '100%',
+    marginTop: 16,
+  },
+  subscribeButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  subscribeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  securityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 12,
+  },
+  securityText: {
+    fontSize: 13,
+    color: '#6B7280',
   },
 });
