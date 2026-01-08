@@ -15,7 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY', 'INR'];
+const CURRENCIES = [
+  'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY', 'INR', 'PKR',
+  'MXN', 'BRL', 'ZAR', 'SGD', 'HKD', 'KRW', 'TRY', 'RUB', 'AED', 'SAR',
+  'CUSTOM'
+];
 
 export default function PreferencesScreen() {
   const { user } = useAuth();
