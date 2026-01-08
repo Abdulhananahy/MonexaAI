@@ -1,10 +1,20 @@
 import { Stack } from 'expo-router';
 import { AuthProvider } from '../contexts/AuthContext';
 import { StatusBar } from 'expo-status-bar';
-import { StripeProvider } from '@stripe/stripe-react-native';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import api from '../utils/api';
+
+// Conditionally import Stripe only for native platforms
+let StripeProvider: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    const stripe = require('@stripe/stripe-react-native');
+    StripeProvider = stripe.StripeProvider;
+  } catch (error) {
+    console.warn('Stripe not available:', error);
+  }
+}
 
 export default function RootLayout() {
   const [publishableKey, setPublishableKey] = useState('');
