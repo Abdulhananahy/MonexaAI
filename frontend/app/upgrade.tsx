@@ -7,19 +7,30 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { CardField, useStripe } from '@stripe/stripe-react-native';
 import api from '../utils/api';
+
+// Conditionally import Stripe only for native
+let CardField: any = null;
+let useStripe: any = null;
+
+if (Platform.OS !== 'web') {
+  const stripeModule = require('@stripe/stripe-react-native');
+  CardField = stripeModule.CardField;
+  useStripe = stripeModule.useStripe;
+}
 
 export default function UpgradeScreen() {
   const router = useRouter();
-  const { confirmPayment } = useStripe();
+  const stripe = Platform.OS !== 'web' && useStripe ? useStripe() : null;
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro'>('pro');
   const [loading, setLoading] = useState(false);
   const [cardComplete, setCardComplete] = useState(false);
+  const isWeb = Platform.OS === 'web';
 
   const plans = [
     {
