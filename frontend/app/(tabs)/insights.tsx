@@ -861,4 +861,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  customDateContainer: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  customDateLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  dateInputsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateInputWrapper: {
+    flex: 1,
+  },
+  dateInputLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  dateInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+  },
+  dateInputText: {
+    fontSize: 14,
+    color: '#1F2937',
+  },
+  applyDateButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    backgroundColor: '#D32F2F',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  applyDateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
