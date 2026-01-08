@@ -76,8 +76,18 @@ export default function AddTransactionScreen() {
   };
 
   const handleSave = async () => {
-    if (!amount || !categoryId) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!amount) {
+      Alert.alert('Error', 'Please fill in amount');
+      return;
+    }
+
+    if (type === 'expense' && !categoryId) {
+      Alert.alert('Error', 'Please select a category');
+      return;
+    }
+
+    if (type === 'income' && !incomeSource) {
+      Alert.alert('Error', 'Please select an income source');
       return;
     }
 
@@ -89,13 +99,21 @@ export default function AddTransactionScreen() {
 
     setLoading(true);
     try {
-      await api.post('/transactions', {
+      const payload: any = {
         type,
         amount: numAmount,
-        category_name: categoryId,
         date: format(date, 'yyyy-MM-dd'),
         note: note || null,
-      });
+      };
+
+      if (type === 'income') {
+        payload.income_source = incomeSource;
+        payload.category_name = 'Salary'; // Default category for income
+      } else {
+        payload.category_name = categoryId;
+      }
+
+      await api.post('/transactions', payload);
       Alert.alert('Success', 'Transaction added successfully');
       router.back();
     } catch (error) {
