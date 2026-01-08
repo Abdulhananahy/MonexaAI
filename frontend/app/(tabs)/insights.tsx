@@ -422,12 +422,86 @@ export default function InsightsScreen() {
           <Text style={styles.sectionTitle}>Time Period</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.periodSelector}>
-              {(['week', 'month', 'year', 'all'] as TimePeriod[]).map((period) => (
+              {(['today', 'yesterday', 'week', 'month', 'year', 'all', 'custom'] as TimePeriod[]).map((period) => (
                 <TouchableOpacity
                   key={period}
                   style={[styles.periodChip, timePeriod === period && styles.periodChipActive]}
-                  onPress={() => setTimePeriod(period)}
+                  onPress={() => {
+                    if (period === 'custom') {
+                      setShowDatePicker(true);
+                    }
+                    setTimePeriod(period);
+                  }}
                 >
+                  <Text
+                    style={[
+                      styles.periodChipText,
+                      timePeriod === period && styles.periodChipTextActive,
+                    ]}
+                  >
+                    {period === 'today' 
+                      ? 'Today' 
+                      : period === 'yesterday' 
+                      ? 'Yesterday' 
+                      : period === 'custom' 
+                      ? 'Custom Date' 
+                      : period.charAt(0).toUpperCase() + period.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          
+          {/* Custom Date Picker */}
+          {showDatePicker && timePeriod === 'custom' && (
+            <View style={styles.customDateContainer}>
+              <Text style={styles.customDateLabel}>Select Date Range:</Text>
+              <View style={styles.dateInputsRow}>
+                <View style={styles.dateInputWrapper}>
+                  <Text style={styles.dateInputLabel}>From</Text>
+                  <TouchableOpacity 
+                    style={styles.dateInput}
+                    onPress={() => {
+                      // For web, use a simple prompt. On native, you'd use DateTimePicker
+                      const dateStr = prompt('Enter start date (YYYY-MM-DD):');
+                      if (dateStr) {
+                        setCustomStartDate(new Date(dateStr));
+                      }
+                    }}
+                  >
+                    <Text style={styles.dateInputText}>
+                      {customStartDate ? customStartDate.toLocaleDateString() : 'Select Date'}
+                    </Text>
+                    <Ionicons name="calendar" size={20} color="#D32F2F" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.dateInputWrapper}>
+                  <Text style={styles.dateInputLabel}>To</Text>
+                  <TouchableOpacity 
+                    style={styles.dateInput}
+                    onPress={() => {
+                      const dateStr = prompt('Enter end date (YYYY-MM-DD):');
+                      if (dateStr) {
+                        setCustomEndDate(new Date(dateStr));
+                      }
+                    }}
+                  >
+                    <Text style={styles.dateInputText}>
+                      {customEndDate ? customEndDate.toLocaleDateString() : 'Select Date'}
+                    </Text>
+                    <Ionicons name="calendar" size={20} color="#D32F2F" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.applyDateButton}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.applyDateButtonText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
                   <Text
                     style={[
                       styles.periodChipText,
