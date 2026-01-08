@@ -361,6 +361,10 @@ async def delete_category(category_id: str, current_user: dict = Depends(get_cur
 @api_router.post("/chat")
 async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_current_user)):
     try:
+        # Get chat history to check if this is first message
+        existing_messages = await db.chat_messages.find({"user_id": current_user["id"]}).to_list(1000)
+        is_first_message = len(existing_messages) == 0
+        
         # Save user message
         user_message_doc = {
             "user_id": current_user["id"],
@@ -369,6 +373,30 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
             "created_at": datetime.utcnow()
         }
         await db.chat_messages.insert_one(user_message_doc)
+        
+        # Check if user is setting tone preference
+        message_lower = request.message.lower()
+        if any(word in message_lower for word in ['strict', 'funny', 'friendly']):
+            if 'strict' in message_lower:
+                tone = 'strict'
+                await db.users.update_one(
+                    {"_id": ObjectId(current_user["id"])},
+                    {"$set": {"chat_tone": "strict"}}
+                )
+            elif 'funny' in message_lower:
+                tone = 'funny'
+                await db.users.update_one(
+                    {"_id": ObjectId(current_user["id"])},
+                    {"$set": {"chat_tone": "funny"}}
+                )
+            else:
+                tone = 'friendly'
+                await db.users.update_one(
+                    {"_id": ObjectId(current_user["id"])},
+                    {"$set": {"chat_tone": "friendly"}}
+                )
+        else:
+            tone = current_user.get('chat_tone', 'friendly')
         
         # Get user context: transactions and categories
         transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
@@ -389,7 +417,7 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         # Get recent transactions (last 5)
         recent_transactions = sorted(transactions, key=lambda x: x["date"], reverse=True)[:5]
         recent_trans_text = "\n".join([
-            f"- {t['type'].title()}: ${t['amount']:.2f} for {t['category_name']} on {t['date'][:10]}" 
+            f"- {t['type'].title()}: ${t['amount']:.2f} for {t['category_name']}{' ('+t.get('income_source', '')+')' if t.get('income_source') else ''} on {t['date'][:10]}" 
             for t in recent_transactions
         ]) if recent_transactions else "No recent transactions"
         
@@ -399,55 +427,119 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
             f"- {cat}: ${amt:.2f}" for cat, amt in top_categories
         ]) if top_categories else "No spending yet"
         
-        # Build friendly, wise AI context
-        context = f"""You are Monexa, a friendly AI financial buddy and advisor. You're warm, wise, and genuinely care about {current_user['full_name']}'s financial wellbeing.
+        # Available categories for quick reference
+        category_names = [cat['name'] for cat in categories]
+        
+        # Tone configurations
+        tone_configs = {
+            'strict': {
+                'personality': 'Direct, disciplined, and no-nonsense. You hold users accountable.',
+                'style': 'Brief and commanding. Use phrases like "You need to...", "Stop...", "Focus on..."',
+                'emoji': 'None or minimal (⚠️, 📊)'
+            },
+            'funny': {
+                'personality': 'Witty, humorous, and entertaining while being helpful. Make finance fun!',
+                'style': 'Light-hearted with jokes/puns. Use phrases like "Holy guacamole!", "Yikes!", "Cha-ching!"',
+                'emoji': 'Frequent (😄, 🤑, 💸, 🎉, 😅)'
+            },
+            'friendly': {
+                'personality': 'Warm, supportive, and encouraging. Like a caring friend.',
+                'style': 'Gentle and positive. Use phrases like "Great job!", "You\'re doing well!", "Let\'s try..."',
+                'emoji': 'Moderate (👋, 💪, ✨, 🎯)'
+            }
+        }
+        
+        current_tone = tone_configs.get(tone, tone_configs['friendly'])
+        
+        # Special handling for first message
+        if is_first_message:
+            intro_response = f"""Hey {current_user['full_name'].split()[0]}! 👋 I'm Monexa, your AI financial buddy.
 
-YOUR PERSONALITY:
-- Friendly and conversational (like talking to a trusted friend)
-- Wise and insightful (provide thoughtful financial wisdom)
-- Proactive (offer advice without being asked)
-- Supportive (celebrate wins, encourage during tough times)
-- Clear and concise (2-3 sentences max)
+**Here's how I can help you:**
 
-WHAT YOU KNOW ABOUT {current_user['full_name'].split()[0]}:
-💰 Current Balance: ${balance:.2f}
-📈 Total Income: ${total_income:.2f}
-📉 Total Expenses: ${total_expense:.2f}
-📊 Transactions Tracked: {len(transactions)}
+• **Track & Analyze**: I monitor all your income, expenses, and spending patterns
+• **Smart Advice**: Get personalized financial wisdom based on your actual data  
+• **Quick Actions**: Add transactions, set budgets, or manage categories—all through chat!
+• **Financial Goals**: Let's work together on saving, budgeting, and building better habits
+
+**Current Status:**
+Balance: ${balance:.2f} | Income: ${total_income:.2f} | Expenses: ${total_expense:.2f}
+
+**Choose Your Chat Style:**
+How should I talk to you?
+
+• Type **"Strict"** - Direct and disciplined coaching
+• Type **"Funny"** - Humorous and entertaining advice  
+• Type **"Friendly"** - Warm and supportive guidance (current)
+
+**Try these commands:**
+- "Add $50 expense for food"
+- "Set monthly budget to $2000"  
+- "Show my spending this month"
+- "How am I doing?"
+
+What would you like to explore first?"""
+            
+            ai_message_doc = {
+                "user_id": current_user["id"],
+                "role": "assistant",
+                "text": intro_response,
+                "created_at": datetime.utcnow()
+            }
+            await db.chat_messages.insert_one(ai_message_doc)
+            return {"message": intro_response}
+        
+        # Build context based on tone
+        context = f"""You are Monexa, an AI financial buddy with {current_tone['personality']}
+
+TONE: {tone.upper()}
+{current_tone['style']}
+Emoji usage: {current_tone['emoji']}
+
+FINANCIAL DATA FOR {current_user['full_name'].split()[0]}:
+💰 Balance: ${balance:.2f}
+📈 Income: ${total_income:.2f}
+📉 Expenses: ${total_expense:.2f}
+📊 Transactions: {len(transactions)}
 
 RECENT ACTIVITY:
 {recent_trans_text}
 
-TOP SPENDING AREAS:
+TOP SPENDING:
 {top_spending_text}
 
-YOUR APPROACH:
-1. Start conversations with insights from their data (don't ask for info you already have!)
-2. Offer wisdom and practical advice based on spending patterns
-3. Be encouraging and positive
-4. Ask thoughtful questions about their financial goals
-5. Share tips that are specific to their situation
+AVAILABLE CATEGORIES: {', '.join(category_names)}
 
-RESPONSE STYLE:
-- Use their first name occasionally
-- Be warm: "Hey!", "I noticed...", "Great job on..."
-- Offer wisdom: "Here's what I'm seeing...", "One thing to consider..."
-- Be brief: 2-3 sentences maximum
-- Use emojis sparingly (1-2 max) for warmth
+SPECIAL CAPABILITIES - You can help users take actions:
+1. Add transactions: "add $50 expense for food", "log $1000 income from salary"
+2. Set budgets: "set budget to $2000", "monthly budget $1500"
+3. Create categories: "add category coffee", "new category entertainment"
+4. Financial queries: "how much did I spend?", "show my income"
 
-WHAT NOT TO DO:
-- Don't ask for data you already have
-- Don't give investment advice
-- Don't be robotic or formal
-- Don't write long paragraphs
-- Don't state obvious facts without insight
+DETECTION RULES - When user wants to:
+- ADD EXPENSE: "add", "spent", "bought", "paid" + amount + category
+- ADD INCOME: "earned", "received", "got paid", "income" + amount + source
+- SET BUDGET: "budget", "limit" + amount
+- CREATE CATEGORY: "add category", "new category" + name
+- QUERY DATA: "how much", "show me", "what did I", "spending"
 
-Now respond to their message with warmth and wisdom."""
+RESPONSE FORMAT:
+1. Detect if action is requested
+2. If action: Confirm what you'll do (I'll add/set/create...) + provide transaction details
+3. Keep under 3 sentences
+4. Use {current_tone['style']}
+
+If user asks to add/modify data, format response like:
+"✅ [Action confirmed]. [Brief insight]. [Optional question]"
+
+Example: "✅ Added $50 expense for Food. That brings your food spending to $150 this month. Want to set a food budget?"
+
+Now respond to their message with your {tone} tone!"""
 
         # Initialize AI chat
         chat = LlmChat(
             api_key=os.environ.get('EMERGENT_LLM_KEY'),
-            session_id=f"monexa_{current_user['id']}",
+            session_id=f"monexa_{current_user['id']}_{tone}",
             system_message=context
         ).with_model("openai", "gpt-5.2")
         
