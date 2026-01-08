@@ -374,28 +374,75 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
         categories = await db.categories.find({"user_id": current_user["id"]}).to_list(100)
         
-        # Calculate totals
+        # Calculate comprehensive financial data
         total_income = sum(t["amount"] for t in transactions if t["type"] == "income")
         total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense")
         balance = total_income - total_expense
         
-        # Build context for AI
-        context = f"""You are Monexa, an AI personal finance assistant. Provide concise, actionable insights.
+        # Get category-wise spending
+        category_spending = {}
+        for t in transactions:
+            if t["type"] == "expense":
+                cat = t["category_name"]
+                category_spending[cat] = category_spending.get(cat, 0) + t["amount"]
+        
+        # Get recent transactions (last 5)
+        recent_transactions = sorted(transactions, key=lambda x: x["date"], reverse=True)[:5]
+        recent_trans_text = "\n".join([
+            f"- {t['type'].title()}: ${t['amount']:.2f} for {t['category_name']} on {t['date'][:10]}" 
+            for t in recent_transactions
+        ]) if recent_transactions else "No recent transactions"
+        
+        # Top spending categories
+        top_categories = sorted(category_spending.items(), key=lambda x: x[1], reverse=True)[:3]
+        top_spending_text = "\n".join([
+            f"- {cat}: ${amt:.2f}" for cat, amt in top_categories
+        ]) if top_categories else "No spending yet"
+        
+        # Build friendly, wise AI context
+        context = f"""You are Monexa, a friendly AI financial buddy and advisor. You're warm, wise, and genuinely care about {current_user['full_name']}'s financial wellbeing.
 
-User: {current_user['full_name']}
-Balance: {balance:.2f} {current_user.get('currency', 'USD')}
-Income: {total_income:.2f} | Expenses: {total_expense:.2f}
-Transactions: {len(transactions)}
+YOUR PERSONALITY:
+- Friendly and conversational (like talking to a trusted friend)
+- Wise and insightful (provide thoughtful financial wisdom)
+- Proactive (offer advice without being asked)
+- Supportive (celebrate wins, encourage during tough times)
+- Clear and concise (2-3 sentences max)
 
-Guidelines:
-- Keep responses under 3 sentences
-- Use actual numbers from user data
-- Be direct and specific
-- No generic advice
-- Focus on patterns and actionable steps
-- If insufficient data, ask ONE specific question
+WHAT YOU KNOW ABOUT {current_user['full_name'].split()[0]}:
+💰 Current Balance: ${balance:.2f}
+📈 Total Income: ${total_income:.2f}
+📉 Total Expenses: ${total_expense:.2f}
+📊 Transactions Tracked: {len(transactions)}
 
-Answer based on their real data only."""
+RECENT ACTIVITY:
+{recent_trans_text}
+
+TOP SPENDING AREAS:
+{top_spending_text}
+
+YOUR APPROACH:
+1. Start conversations with insights from their data (don't ask for info you already have!)
+2. Offer wisdom and practical advice based on spending patterns
+3. Be encouraging and positive
+4. Ask thoughtful questions about their financial goals
+5. Share tips that are specific to their situation
+
+RESPONSE STYLE:
+- Use their first name occasionally
+- Be warm: "Hey!", "I noticed...", "Great job on..."
+- Offer wisdom: "Here's what I'm seeing...", "One thing to consider..."
+- Be brief: 2-3 sentences maximum
+- Use emojis sparingly (1-2 max) for warmth
+
+WHAT NOT TO DO:
+- Don't ask for data you already have
+- Don't give investment advice
+- Don't be robotic or formal
+- Don't write long paragraphs
+- Don't state obvious facts without insight
+
+Now respond to their message with warmth and wisdom."""
 
         # Initialize AI chat
         chat = LlmChat(
