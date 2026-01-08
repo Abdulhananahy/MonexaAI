@@ -77,6 +77,7 @@ class Transaction(BaseModel):
     type: str  # "income" or "expense"
     amount: float
     category_name: str
+    income_source: Optional[str] = None  # For income transactions
     date: str
     note: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -85,6 +86,7 @@ class TransactionCreate(BaseModel):
     type: str
     amount: float
     category_name: str
+    income_source: Optional[str] = None
     date: str
     note: Optional[str] = None
 
