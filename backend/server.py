@@ -280,7 +280,8 @@ async def create_transaction(transaction: TransactionCreate, current_user: dict 
     
     result = await db.transactions.insert_one(transaction_dict)
     transaction_dict["id"] = str(result.inserted_id)
-    del transaction_dict["_id"] if "_id" in transaction_dict else None
+    if "_id" in transaction_dict:
+        del transaction_dict["_id"]
     
     return transaction_dict
 
