@@ -197,10 +197,40 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Ask Monexa</Text>
-        <TouchableOpacity onPress={loadChatHistory}>
-          <Ionicons name="refresh" size={24} color="#1F2937" />
+        <TouchableOpacity onPress={() => setShowMenu(true)}>
+          <Ionicons name="ellipsis-vertical" size={24} color="#1F2937" />
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={styles.menuContainer}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleNewChat}>
+              <Ionicons name="add-circle-outline" size={20} color="#1F2937" />
+              <Text style={styles.menuItemText}>Start New Chat</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.menuItem} onPress={handleClearChat}>
+              <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              <Text style={[styles.menuItemText, styles.menuItemDanger]}>Clear History</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.menuItem} onPress={() => setShowMenu(false)}>
+              <Ionicons name="close-circle-outline" size={20} color="#6B7280" />
+              <Text style={styles.menuItemText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
