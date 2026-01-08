@@ -133,7 +133,114 @@ class UserPreferences(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
+class SubscriptionPlan(BaseModel):
+    id: Optional[str] = None
+    user_id: str
+    plan_type: str  # "free", "starter", "pro"
+    status: str  # "active", "cancelled", "expired"
+    start_date: datetime
+    end_date: Optional[datetime] = None
+    stripe_subscription_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CreateSubscriptionRequest(BaseModel):
+    plan_type: str  # "starter" or "pro"
+    payment_method_id: str
+
+class ConvertCurrencyRequest(BaseModel):
+    from_currency: str
+    to_currency: str
+
 # ============ HELPER FUNCTIONS ============
+
+async def get_exchange_rate(from_currency: str, to_currency: str) -> float:
+    """Fetch exchange rate from API"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{EXCHANGE_RATE_BASE_URL}{from_currency}"
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    rates = data.get('rates', {})
+                    return rates.get(to_currency, 1.0)
+                return 1.0
+    except Exception as e:
+        logger.error(f"Exchange rate fetch error: {str(e)}")
+        return 1.0
+
+async def convert_user_transactions(user_id: str, from_currency: str, to_currency: str):
+    """Convert all user transactions to new currency"""
+    if from_currency == to_currency:
+        return
+    
+    rate = await get_exchange_rate(from_currency, to_currency)
+    
+    # Update all transactions
+    transactions = await db.transactions.find({"user_id": user_id}).to_list(10000)
+    
+    for transaction in transactions:
+        new_amount = transaction['amount'] * rate
+        await db.transactions.update_one(
+            {"_id": transaction["_id"]},
+            {"$set": {"amount": new_amount}}
+        )
+    
+    # Update budget if exists
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if user and user.get('monthly_budget'):
+        new_budget = user['monthly_budget'] * rate
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"monthly_budget": new_budget}}
+        )
+
+def get_subscription_limits(plan_type: str) -> dict:
+    """Get feature limits based on subscription plan"""
+    limits = {
+        "free": {
+            "ai_messages_per_day": 10,
+            "charts_enabled": False,
+            "export_enabled": False,
+            "history_days": 30,
+            "chart_types": []
+        },
+        "starter": {
+            "ai_messages_per_day": 50,
+            "charts_enabled": True,
+            "export_enabled": False,
+            "history_days": 90,
+            "chart_types": ["bar", "pie"]
+        },
+        "pro": {
+            "ai_messages_per_day": -1,  # unlimited
+            "charts_enabled": True,
+            "export_enabled": True,
+            "history_days": -1,  # unlimited
+            "chart_types": ["bar", "pie", "line"]
+        }
+    }
+    return limits.get(plan_type, limits["free"])
+
+async def check_ai_message_limit(user_id: str) -> bool:
+    """Check if user has exceeded AI message limit"""
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    subscription = await db.subscriptions.find_one({"user_id": user_id, "status": "active"})
+    
+    plan_type = subscription.get("plan_type", "free") if subscription else "free"
+    limits = get_subscription_limits(plan_type)
+    
+    if limits["ai_messages_per_day"] == -1:
+        return True  # Unlimited
+    
+    # Count messages today
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    message_count = await db.chat_messages.count_documents({
+        "user_id": user_id,
+        "role": "user",
+        "created_at": {"$gte": today_start}
+    })
+    
+    return message_count < limits["ai_messages_per_day"]
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
