@@ -62,15 +62,29 @@ export default function UpgradeScreen() {
   ];
 
   const handleSubscribe = async () => {
+    if (isWeb) {
+      Alert.alert(
+        'Mobile Only',
+        'Payment subscription is only available on mobile devices. Please use the Monexa mobile app to subscribe.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     if (!cardComplete) {
       Alert.alert('Error', 'Please enter complete card details');
+      return;
+    }
+
+    if (!stripe || !stripe.confirmPayment) {
+      Alert.alert('Error', 'Payment system not initialized');
       return;
     }
 
     setLoading(true);
     try {
       // Create payment method
-      const { paymentMethod, error: pmError } = await confirmPayment(
+      const { paymentMethod, error: pmError } = await stripe.confirmPayment(
         {
           paymentMethodType: 'Card',
         },
@@ -97,7 +111,7 @@ export default function UpgradeScreen() {
 
       // Handle 3D Secure if needed
       if (response.data.client_secret) {
-        const { error: confirmError } = await confirmPayment(response.data.client_secret);
+        const { error: confirmError } = await stripe.confirmPayment(response.data.client_secret);
         
         if (confirmError) {
           Alert.alert('Payment Failed', confirmError.message);
