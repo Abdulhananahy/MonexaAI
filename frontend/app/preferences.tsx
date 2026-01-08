@@ -25,6 +25,8 @@ export default function PreferencesScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [currency, setCurrency] = useState(user?.currency || 'USD');
+  const [customCurrency, setCustomCurrency] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
   const [monthlyBudget, setMonthlyBudget] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -35,18 +37,50 @@ export default function PreferencesScreen() {
   const loadPreferences = async () => {
     try {
       const response = await api.get('/profile');
-      setCurrency(response.data.currency || 'USD');
+      const userCurrency = response.data.currency || 'USD';
+      setCurrency(userCurrency);
+      
+      // Check if currency is custom (not in predefined list)
+      if (!CURRENCIES.includes(userCurrency) && userCurrency !== 'CUSTOM') {
+        setCustomCurrency(userCurrency);
+        setShowCustomInput(true);
+        setCurrency('CUSTOM');
+      }
+      
       setMonthlyBudget(response.data.monthly_budget?.toString() || '');
     } catch (error) {
       console.error('Failed to load preferences:', error);
     }
   };
 
+  const handleCurrencySelect = (curr: string) => {
+    if (curr === 'CUSTOM') {
+      setShowCustomInput(true);
+      setCurrency(curr);
+    } else {
+      setShowCustomInput(false);
+      setCustomCurrency('');
+      setCurrency(curr);
+    }
+  };
+
   const handleSave = async () => {
+    const finalCurrency = currency === 'CUSTOM' ? customCurrency.trim().toUpperCase() : currency;
+    
+    if (!finalCurrency) {
+      Alert.alert('Error', 'Please select or enter a currency');
+      return;
+    }
+    
+    if (currency === 'CUSTOM' && customCurrency.trim().length > 10) {
+      Alert.alert('Error', 'Currency code must be 10 characters or less');
+      return;
+    }
+
     setLoading(true);
     try {
       await api.put('/profile/preferences', {
-        currency,
+        currency: finalCurrency,
         monthly_budget: monthlyBudget ? parseFloat(monthlyBudget) : null,
       });
       Alert.alert('Success', 'Preferences updated successfully');
