@@ -108,16 +108,34 @@ export default function HomeScreen() {
             style={styles.actionButton}
             onPress={() => router.push('/add-transaction' as any)}
           >
-            <Ionicons name="add-circle" size={24} color="#D32F2F" />
+            <Ionicons name="add-circle" size={20} color="#D32F2F" />
             <Text style={styles.actionButtonText}>Add Transaction</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
             style={styles.actionButton}
+            onPress={() => router.push('/(tabs)/insights')}
+          >
+            <Ionicons name="analytics" size={20} color="#D32F2F" />
+            <Text style={styles.actionButtonText}>Quick Insights</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.quickActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
             onPress={() => router.push('/(tabs)/chat')}
           >
-            <Ionicons name="chatbubbles" size={24} color="#D32F2F" />
+            <Ionicons name="chatbubbles" size={20} color="#D32F2F" />
             <Text style={styles.actionButtonText}>Ask Monexa</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/budget' as any)}
+          >
+            <Ionicons name="wallet" size={20} color="#D32F2F" />
+            <Text style={styles.actionButtonText}>Set Budget</Text>
           </TouchableOpacity>
         </View>
 
