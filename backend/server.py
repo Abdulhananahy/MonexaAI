@@ -1090,8 +1090,18 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
 @api_router.put("/profile/preferences")
 async def update_preferences(preferences: UserPreferences, current_user: dict = Depends(get_current_user)):
     update_data = {}
+    
+    # Handle currency change with conversion
     if preferences.currency:
-        update_data["currency"] = preferences.currency
+        old_currency = current_user.get('currency', 'USD')
+        new_currency = preferences.currency
+        
+        if old_currency != new_currency:
+            # Convert all transactions
+            await convert_user_transactions(current_user["id"], old_currency, new_currency)
+            update_data["currency"] = new_currency
+            logger.info(f"Converted transactions from {old_currency} to {new_currency} for user {current_user['id']}")
+    
     if preferences.monthly_budget is not None:
         update_data["monthly_budget"] = preferences.monthly_budget
     
@@ -1101,7 +1111,187 @@ async def update_preferences(preferences: UserPreferences, current_user: dict = 
             {"$set": update_data}
         )
     
-    return {"message": "Preferences updated successfully"}
+    return {"message": "Preferences updated successfully", "converted": bool(preferences.currency)}
+
+# ============ SUBSCRIPTION ROUTES ============
+
+@api_router.get("/subscription/current")
+async def get_current_subscription(current_user: dict = Depends(get_current_user)):
+    """Get user's current subscription plan"""
+    subscription = await db.subscriptions.find_one({
+        "user_id": current_user["id"],
+        "status": "active"
+    })
+    
+    if subscription:
+        return {
+            "plan_type": subscription["plan_type"],
+            "status": subscription["status"],
+            "limits": get_subscription_limits(subscription["plan_type"]),
+            "start_date": subscription["start_date"].isoformat(),
+            "end_date": subscription.get("end_date").isoformat() if subscription.get("end_date") else None
+        }
+    
+    # Return free plan
+    return {
+        "plan_type": "free",
+        "status": "active",
+        "limits": get_subscription_limits("free"),
+        "start_date": current_user.get("created_at", datetime.utcnow()).isoformat(),
+        "end_date": None
+    }
+
+@api_router.get("/subscription/plans")
+async def get_subscription_plans():
+    """Get available subscription plans"""
+    plans = [
+        {
+            "id": "free",
+            "name": "Free",
+            "price": 0,
+            "interval": "month",
+            "features": [
+                "Unlimited transactions",
+                "Basic categories",
+                "10 AI messages/day",
+                "Basic insights",
+                "30 days history"
+            ],
+            "limits": get_subscription_limits("free")
+        },
+        {
+            "id": "starter",
+            "name": "Starter",
+            "price": 3,
+            "interval": "month",
+            "features": [
+                "Everything in Free",
+                "50 AI messages/day",
+                "Basic charts (bar/pie)",
+                "90 days history",
+                "Budget alerts",
+                "Email support"
+            ],
+            "limits": get_subscription_limits("starter")
+        },
+        {
+            "id": "pro",
+            "name": "Pro",
+            "price": 9,
+            "interval": "month",
+            "features": [
+                "Everything in Starter",
+                "Unlimited AI chat",
+                "All chart types",
+                "Unlimited history",
+                "CSV export",
+                "Advanced insights",
+                "Priority support"
+            ],
+            "limits": get_subscription_limits("pro")
+        }
+    ]
+    return {"plans": plans}
+
+@api_router.post("/subscription/create")
+async def create_subscription(
+    request: CreateSubscriptionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new subscription (Stripe integration)"""
+    try:
+        # In production, this would use Stripe API
+        # For MVP, we'll create a mock subscription
+        
+        plan_type = request.plan_type
+        if plan_type not in ["starter", "pro"]:
+            raise HTTPException(status_code=400, detail="Invalid plan type")
+        
+        # Check if user already has active subscription
+        existing = await db.subscriptions.find_one({
+            "user_id": current_user["id"],
+            "status": "active"
+        })
+        
+        if existing:
+            # Cancel old subscription
+            await db.subscriptions.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"status": "cancelled", "end_date": datetime.utcnow()}}
+            )
+        
+        # Create new subscription
+        subscription = {
+            "user_id": current_user["id"],
+            "plan_type": plan_type,
+            "status": "active",
+            "start_date": datetime.utcnow(),
+            "end_date": datetime.utcnow() + timedelta(days=30),
+            "stripe_subscription_id": f"sub_mock_{current_user['id']}_{plan_type}",
+            "created_at": datetime.utcnow()
+        }
+        
+        result = await db.subscriptions.insert_one(subscription)
+        
+        logger.info(f"Created {plan_type} subscription for user {current_user['id']}")
+        
+        return {
+            "success": True,
+            "subscription_id": str(result.inserted_id),
+            "plan_type": plan_type,
+            "message": f"Successfully subscribed to {plan_type.title()} plan!",
+            "limits": get_subscription_limits(plan_type)
+        }
+        
+    except Exception as e:
+        logger.error(f"Subscription creation error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create subscription")
+
+@api_router.post("/subscription/cancel")
+async def cancel_subscription(current_user: dict = Depends(get_current_user)):
+    """Cancel current subscription"""
+    subscription = await db.subscriptions.find_one({
+        "user_id": current_user["id"],
+        "status": "active"
+    })
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    
+    await db.subscriptions.update_one(
+        {"_id": subscription["_id"]},
+        {"$set": {"status": "cancelled", "end_date": datetime.utcnow()}}
+    )
+    
+    return {"message": "Subscription cancelled successfully"}
+
+@api_router.get("/subscription/usage")
+async def get_subscription_usage(current_user: dict = Depends(get_current_user)):
+    """Get current usage stats"""
+    subscription = await db.subscriptions.find_one({
+        "user_id": current_user["id"],
+        "status": "active"
+    })
+    
+    plan_type = subscription.get("plan_type", "free") if subscription else "free"
+    limits = get_subscription_limits(plan_type)
+    
+    # Count AI messages today
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    ai_messages_today = await db.chat_messages.count_documents({
+        "user_id": current_user["id"],
+        "role": "user",
+        "created_at": {"$gte": today_start}
+    })
+    
+    return {
+        "plan_type": plan_type,
+        "ai_messages_today": ai_messages_today,
+        "ai_messages_limit": limits["ai_messages_per_day"],
+        "ai_messages_remaining": limits["ai_messages_per_day"] - ai_messages_today if limits["ai_messages_per_day"] != -1 else -1,
+        "charts_enabled": limits["charts_enabled"],
+        "export_enabled": limits["export_enabled"]
+    }
 
 # ============ ROOT ROUTES ============
 
