@@ -340,3 +340,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Completed full MVP implementation of Monexa app. Backend has all APIs ready (auth, transactions, categories, AI chat, analytics). Frontend has complete mobile UI with all screens. Auth signup endpoint tested successfully. Ready for comprehensive backend testing."
+  - agent: "main"
+    message: "Resuming from previous session. Services restarted. Now initiating comprehensive backend testing for all APIs: Auth (signup, login, forgot password), Transactions CRUD, Categories CRUD, AI Chat with GPT-5.2, Analytics & Insights, User Profile & Preferences."
