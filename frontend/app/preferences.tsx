@@ -248,6 +248,28 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 8,
   },
+  customCurrencyContainer: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1F2937',
+    backgroundColor: '#FFFFFF',
+  },
   footer: {
     padding: 24,
     borderTopWidth: 1,
