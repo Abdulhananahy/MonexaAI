@@ -22,11 +22,24 @@ interface Category {
   name: string;
 }
 
+// Common income sources
+const INCOME_SOURCES = [
+  'Salary',
+  'Freelance',
+  'Business',
+  'Investment',
+  'Rental',
+  'Gift',
+  'Bonus',
+  'Other',
+];
+
 export default function AddTransactionScreen() {
   const router = useRouter();
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [incomeSource, setIncomeSource] = useState('');
   const [date, setDate] = useState(new Date());
   const [note, setNote] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -36,6 +49,17 @@ export default function AddTransactionScreen() {
   useEffect(() => {
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    // Reset selection when type changes
+    if (type === 'income') {
+      setIncomeSource(INCOME_SOURCES[0]);
+      setCategoryId('');
+    } else {
+      setCategoryId(categories.length > 0 ? categories[0].name : '');
+      setIncomeSource('');
+    }
+  }, [type]);
 
   const loadCategories = async () => {
     try {
