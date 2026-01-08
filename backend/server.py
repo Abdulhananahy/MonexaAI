@@ -1428,6 +1428,71 @@ async def get_stripe_config():
     """Get Stripe publishable key for frontend"""
     return {"publishable_key": STRIPE_PUBLISHABLE_KEY}
 
+@api_router.post("/subscription/create-checkout-session")
+async def create_checkout_session(
+    plan_type: str,
+    success_url: str,
+    cancel_url: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a Stripe Checkout session for web payments"""
+    try:
+        if plan_type not in ["starter", "pro"]:
+            raise HTTPException(status_code=400, detail="Invalid plan type")
+        
+        # Get or create Stripe customer
+        user_doc = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+        stripe_customer_id = user_doc.get("stripe_customer_id")
+        
+        if not stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=current_user["email"],
+                name=current_user["full_name"],
+                metadata={"user_id": current_user["id"]}
+            )
+            stripe_customer_id = customer.id
+            await db.users.update_one(
+                {"_id": ObjectId(current_user["id"])},
+                {"$set": {"stripe_customer_id": stripe_customer_id}}
+            )
+        
+        # Create price in Stripe (or use existing price IDs)
+        prices = {"starter": 300, "pro": 900}  # in cents
+        price_amount = prices[plan_type]
+        
+        # Create Checkout Session
+        checkout_session = stripe.checkout.Session.create(
+            customer=stripe_customer_id,
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'Monexa {plan_type.capitalize()} Plan',
+                        'description': f'Monthly subscription to Monexa {plan_type.capitalize()}',
+                    },
+                    'unit_amount': price_amount,
+                    'recurring': {
+                        'interval': 'month',
+                    },
+                },
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                'user_id': current_user["id"],
+                'plan_type': plan_type,
+            }
+        )
+        
+        return {"checkout_url": checkout_session.url, "session_id": checkout_session.id}
+    
+    except Exception as e:
+        logger.error(f"Checkout session creation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create checkout session: {str(e)}")
+
 @api_router.post("/subscription/cancel")
 async def cancel_subscription(current_user: dict = Depends(get_current_user)):
     """Cancel current subscription with real Stripe"""
