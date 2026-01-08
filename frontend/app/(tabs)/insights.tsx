@@ -502,19 +502,6 @@ export default function InsightsScreen() {
             </View>
           )}
         </View>
-                  <Text
-                    style={[
-                      styles.periodChipText,
-                      timePeriod === period && styles.periodChipTextActive,
-                    ]}
-                  >
-                    {period === 'all' ? 'All Time' : `This ${period.charAt(0).toUpperCase() + period.slice(1)}`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
 
         {/* View Mode Selector */}
         <View style={styles.section}>
