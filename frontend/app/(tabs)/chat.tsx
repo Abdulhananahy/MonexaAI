@@ -26,6 +26,7 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -54,6 +55,75 @@ export default function ChatScreen() {
     } finally {
       setInitialLoad(false);
     }
+  };
+
+  const handleNewChat = () => {
+    Alert.alert(
+      'Start New Chat',
+      'What would you like to do with the current conversation?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive & Start New',
+          onPress: async () => {
+            try {
+              await api.post('/chat/archive');
+              setMessages([]);
+              Alert.alert('Success', 'Previous chat archived. Starting fresh!');
+              setShowMenu(false);
+              loadChatHistory();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to archive chat');
+            }
+          },
+        },
+        {
+          text: 'Delete & Start New',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete('/chat/history');
+              setMessages([]);
+              Alert.alert('Success', 'Chat deleted. Starting fresh!');
+              setShowMenu(false);
+              loadChatHistory();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete chat');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleViewArchives = () => {
+    Alert.alert('Coming Soon', 'Archive viewing will be available in the next update!');
+    setShowMenu(false);
+  };
+
+  const handleClearChat = () => {
+    Alert.alert(
+      'Clear Chat',
+      'Are you sure you want to delete this conversation? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete('/chat/history');
+              setMessages([]);
+              Alert.alert('Success', 'Chat history cleared');
+              setShowMenu(false);
+              loadChatHistory();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to clear chat');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const sendMessage = async () => {
