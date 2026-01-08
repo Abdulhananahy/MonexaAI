@@ -34,7 +34,7 @@ interface Transaction {
 }
 
 type ChartType = 'bar' | 'pie' | 'line';
-type TimePeriod = 'week' | 'month' | 'year' | 'all';
+type TimePeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all' | 'custom';
 type ViewMode = 'categories' | 'income-expense';
 
 export default function InsightsScreen() {
@@ -49,6 +49,9 @@ export default function InsightsScreen() {
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [viewMode, setViewMode] = useState<ViewMode>('categories');
+  const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
+  const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Reload data when screen comes into focus
   useFocusEffect(
