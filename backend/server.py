@@ -1294,14 +1294,15 @@ async def create_subscription(
     request: CreateSubscriptionRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    """Create a new subscription (Stripe integration)"""
+    """Create a new subscription with real Stripe payment"""
     try:
-        # In production, this would use Stripe API
-        # For MVP, we'll create a mock subscription
-        
         plan_type = request.plan_type
         if plan_type not in ["starter", "pro"]:
             raise HTTPException(status_code=400, detail="Invalid plan type")
+        
+        # Get price amount
+        prices = {"starter": 3, "pro": 9}
+        amount = prices[plan_type]
         
         # Check if user already has active subscription
         existing = await db.subscriptions.find_one({
@@ -1310,38 +1311,117 @@ async def create_subscription(
         })
         
         if existing:
-            # Cancel old subscription
+            # Cancel old Stripe subscription if exists
+            if existing.get("stripe_subscription_id") and not existing["stripe_subscription_id"].startswith("sub_mock"):
+                try:
+                    stripe.Subscription.cancel(existing["stripe_subscription_id"])
+                except Exception as e:
+                    logger.error(f"Failed to cancel old subscription: {str(e)}")
+            
+            # Update old subscription in DB
             await db.subscriptions.update_one(
                 {"_id": existing["_id"]},
                 {"$set": {"status": "cancelled", "end_date": datetime.utcnow()}}
             )
         
-        # Create new subscription
-        subscription = {
-            "user_id": current_user["id"],
-            "plan_type": plan_type,
-            "status": "active",
-            "start_date": datetime.utcnow(),
-            "end_date": datetime.utcnow() + timedelta(days=30),
-            "stripe_subscription_id": f"sub_mock_{current_user['id']}_{plan_type}",
-            "created_at": datetime.utcnow()
-        }
+        # Create Stripe customer if doesn't exist
+        user_email = current_user["email"]
+        user_name = current_user["full_name"]
         
-        result = await db.subscriptions.insert_one(subscription)
+        # Check if customer exists in our DB
+        user_doc = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+        stripe_customer_id = user_doc.get("stripe_customer_id")
         
-        logger.info(f"Created {plan_type} subscription for user {current_user['id']}")
+        if not stripe_customer_id:
+            # Create new Stripe customer
+            customer = stripe.Customer.create(
+                email=user_email,
+                name=user_name,
+                metadata={"user_id": current_user["id"]}
+            )
+            stripe_customer_id = customer.id
+            
+            # Save to DB
+            await db.users.update_one(
+                {"_id": ObjectId(current_user["id"])},
+                {"$set": {"stripe_customer_id": stripe_customer_id}}
+            )
         
-        return {
-            "success": True,
-            "subscription_id": str(result.inserted_id),
-            "plan_type": plan_type,
-            "message": f"Successfully subscribed to {plan_type.title()} plan!",
-            "limits": get_subscription_limits(plan_type)
-        }
+        # Attach payment method to customer
+        try:
+            stripe.PaymentMethod.attach(
+                request.payment_method_id,
+                customer=stripe_customer_id
+            )
+            
+            # Set as default payment method
+            stripe.Customer.modify(
+                stripe_customer_id,
+                invoice_settings={"default_payment_method": request.payment_method_id}
+            )
+        except Exception as e:
+            logger.error(f"Failed to attach payment method: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Payment method error: {str(e)}")
         
+        # Create Stripe subscription
+        try:
+            stripe_subscription = stripe.Subscription.create(
+                customer=stripe_customer_id,
+                items=[{
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {
+                            "name": f"Monexa {plan_type.title()} Plan",
+                            "description": f"Monthly subscription to Monexa {plan_type.title()}"
+                        },
+                        "recurring": {"interval": "month"},
+                        "unit_amount": amount * 100  # Stripe uses cents
+                    }
+                }],
+                payment_behavior="default_incomplete",
+                payment_settings={"save_default_payment_method": "on_subscription"},
+                expand=["latest_invoice.payment_intent"]
+            )
+            
+            # Create subscription record in DB
+            subscription = {
+                "user_id": current_user["id"],
+                "plan_type": plan_type,
+                "status": "active",
+                "start_date": datetime.utcnow(),
+                "end_date": datetime.utcnow() + timedelta(days=30),
+                "stripe_subscription_id": stripe_subscription.id,
+                "stripe_customer_id": stripe_customer_id,
+                "amount": amount,
+                "created_at": datetime.utcnow()
+            }
+            
+            result = await db.subscriptions.insert_one(subscription)
+            
+            logger.info(f"Created real Stripe subscription {stripe_subscription.id} for user {current_user['id']}")
+            
+            return {
+                "success": True,
+                "subscription_id": str(result.inserted_id),
+                "stripe_subscription_id": stripe_subscription.id,
+                "client_secret": stripe_subscription.latest_invoice.payment_intent.client_secret,
+                "plan_type": plan_type,
+                "amount": amount,
+                "message": f"Successfully subscribed to {plan_type.title()} plan for ${amount}/month!",
+                "limits": get_subscription_limits(plan_type)
+            }
+            
+        except stripe.error.CardError as e:
+            raise HTTPException(status_code=400, detail=f"Card error: {e.user_message}")
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Payment error: {str(e)}")
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Subscription creation error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create subscription")
+        raise HTTPException(status_code=500, detail=f"Failed to create subscription: {str(e)}")
 
 @api_router.post("/subscription/cancel")
 async def cancel_subscription(current_user: dict = Depends(get_current_user)):
