@@ -125,8 +125,8 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Top Spending</Text>
-              <TouchableOpacity onPress={() => router.push('/insights' as any)}>
-                <Text style={styles.seeAll}>View Insights</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/insights')}>
+                <Text style={styles.seeAll}>View All</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.categoriesList}>
