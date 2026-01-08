@@ -14,14 +14,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
 
-// Conditionally import Stripe only for native
+// Conditionally import Stripe only for native - wrapped in try/catch for web safety
 let CardField: any = null;
 let useStripe: any = null;
 
-if (Platform.OS !== 'web') {
-  const stripeModule = require('@stripe/stripe-react-native');
-  CardField = stripeModule.CardField;
-  useStripe = stripeModule.useStripe;
+try {
+  if (Platform.OS !== 'web') {
+    const stripeModule = require('@stripe/stripe-react-native');
+    CardField = stripeModule.CardField;
+    useStripe = stripeModule.useStripe;
+  }
+} catch (error) {
+  console.warn('Stripe not available on this platform');
 }
 
 export default function UpgradeScreen() {
