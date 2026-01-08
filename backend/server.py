@@ -1423,9 +1423,14 @@ async def create_subscription(
         logger.error(f"Subscription creation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create subscription: {str(e)}")
 
+@api_router.get("/subscription/config")
+async def get_stripe_config():
+    """Get Stripe publishable key for frontend"""
+    return {"publishable_key": STRIPE_PUBLISHABLE_KEY}
+
 @api_router.post("/subscription/cancel")
 async def cancel_subscription(current_user: dict = Depends(get_current_user)):
-    """Cancel current subscription"""
+    """Cancel current subscription with real Stripe"""
     subscription = await db.subscriptions.find_one({
         "user_id": current_user["id"],
         "status": "active"
@@ -1434,6 +1439,17 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
     if not subscription:
         raise HTTPException(status_code=404, detail="No active subscription found")
     
+    # Cancel in Stripe if real subscription
+    stripe_sub_id = subscription.get("stripe_subscription_id")
+    if stripe_sub_id and not stripe_sub_id.startswith("sub_mock"):
+        try:
+            stripe.Subscription.cancel(stripe_sub_id)
+            logger.info(f"Cancelled Stripe subscription {stripe_sub_id}")
+        except Exception as e:
+            logger.error(f"Failed to cancel Stripe subscription: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to cancel subscription in Stripe")
+    
+    # Update in database
     await db.subscriptions.update_one(
         {"_id": subscription["_id"]},
         {"$set": {"status": "cancelled", "end_date": datetime.utcnow()}}
