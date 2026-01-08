@@ -330,7 +330,8 @@ async def create_category(category: CategoryCreate, current_user: dict = Depends
     
     result = await db.categories.insert_one(category_dict)
     category_dict["id"] = str(result.inserted_id)
-    del category_dict["_id"] if "_id" in category_dict else None
+    if "_id" in category_dict:
+        del category_dict["_id"]
     
     return category_dict
 
