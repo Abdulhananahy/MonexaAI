@@ -22,7 +22,7 @@ const CURRENCIES = [
 ];
 
 export default function PreferencesScreen() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const router = useRouter();
   const [currency, setCurrency] = useState(user?.currency || 'USD');
   const [customCurrency, setCustomCurrency] = useState('');
