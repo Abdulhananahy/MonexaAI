@@ -83,6 +83,10 @@ export default function PreferencesScreen() {
         currency: finalCurrency,
         monthly_budget: monthlyBudget ? parseFloat(monthlyBudget) : null,
       });
+      
+      // Refresh user data to update currency everywhere
+      await refreshUser();
+      
       Alert.alert('Success', 'Preferences updated successfully');
       router.back();
     } catch (error) {
