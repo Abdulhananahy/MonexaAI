@@ -376,6 +376,306 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         }
         await db.chat_messages.insert_one(user_message_doc)
         
+        # Check for action commands BEFORE sending to AI
+        message_lower = request.message.lower()
+        action_performed = False
+        action_response = ""
+        
+        # ADD EXPENSE
+        if any(word in message_lower for word in ['add', 'spent', 'bought', 'paid']) and 'expense' in message_lower:
+            import re
+            amount_match = re.search(r'\$?(\d+(?:\.\d{2})?)', request.message)
+            category_match = re.search(r'for\s+(\w+)', request.message, re.IGNORECASE)
+            
+            if amount_match and category_match:
+                amount = float(amount_match.group(1))
+                category = category_match.group(1).capitalize()
+                
+                # Create transaction
+                transaction = {
+                    "user_id": current_user["id"],
+                    "type": "expense",
+                    "amount": amount,
+                    "category_name": category,
+                    "date": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "created_at": datetime.utcnow()
+                }
+                await db.transactions.insert_one(transaction)
+                action_performed = True
+                action_response = f"✅ Added ${amount} expense for {category}."
+        
+        # ADD INCOME
+        elif any(word in message_lower for word in ['earned', 'received', 'got paid', 'income']) and not 'expense' in message_lower:
+            import re
+            amount_match = re.search(r'\$?(\d+(?:\.\d{2})?)', request.message)
+            source_match = re.search(r'from\s+(\w+)', request.message, re.IGNORECASE)
+            
+            if amount_match:
+                amount = float(amount_match.group(1))
+                source = source_match.group(1).capitalize() if source_match else "Other"
+                
+                # Create transaction
+                transaction = {
+                    "user_id": current_user["id"],
+                    "type": "income",
+                    "amount": amount,
+                    "category_name": "Income",
+                    "income_source": source,
+                    "date": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "created_at": datetime.utcnow()
+                }
+                await db.transactions.insert_one(transaction)
+                action_performed = True
+                action_response = f"✅ Added ${amount} income from {source}."
+        
+        # SET BUDGET
+        elif any(word in message_lower for word in ['budget', 'limit']):
+            import re
+            amount_match = re.search(r'\$?(\d+(?:\.\d{2})?)', request.message)
+            
+            if amount_match:
+                budget = float(amount_match.group(1))
+                await db.users.update_one(
+                    {"_id": ObjectId(current_user["id"])},
+                    {"$set": {"monthly_budget": budget}}
+                )
+                action_performed = True
+                action_response = f"✅ Monthly budget set to ${budget}."
+        
+        # CREATE CATEGORY
+        elif 'add category' in message_lower or 'new category' in message_lower or 'create category' in message_lower:
+            import re
+            category_match = re.search(r'category\s+(\w+)', request.message, re.IGNORECASE)
+            
+            if category_match:
+                category_name = category_match.group(1).capitalize()
+                
+                # Check if exists
+                existing = await db.categories.find_one({"user_id": current_user["id"], "name": category_name})
+                if not existing:
+                    category = {
+                        "user_id": current_user["id"],
+                        "name": category_name,
+                        "created_at": datetime.utcnow()
+                    }
+                    await db.categories.insert_one(category)
+                    action_performed = True
+                    action_response = f"✅ Created category '{category_name}'."
+                else:
+                    action_response = f"Category '{category_name}' already exists."
+        
+        # If action was performed, send simpler context to AI
+        if action_performed:
+            # Still get updated data
+            transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
+            total_income = sum(t["amount"] for t in transactions if t["type"] == "income")
+            total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense")
+            
+            simple_context = f"""You are Monexa. An action was just completed: {action_response}
+            
+Updated stats: Income ${total_income:.2f}, Expenses ${total_expense:.2f}
+
+Respond with ONE supportive sentence about this action."""
+            
+            chat = LlmChat(
+                api_key=os.environ.get('EMERGENT_LLM_KEY'),
+                session_id=f"monexa_{current_user['id']}_action",
+                system_message=simple_context
+            ).with_model("openai", "gpt-5.2")
+            
+            user_msg = UserMessage(text=action_response)
+            ai_response = await chat.send_message(user_msg)
+            
+            full_response = f"{action_response} {ai_response}"
+            
+            ai_message_doc = {
+                "user_id": current_user["id"],
+                "role": "assistant",
+                "text": full_response,
+                "created_at": datetime.utcnow()
+            }
+            await db.chat_messages.insert_one(ai_message_doc)
+            return {"message": full_response}
+        
+        # Check if user is setting tone preference
+        if any(word in message_lower for word in ['strict', 'funny', 'friendly']):
+            if 'strict' in message_lower:
+                tone = 'strict'
+                await db.users.update_one(
+                    {"_id": ObjectId(current_user["id"])},
+                    {"$set": {"chat_tone": "strict"}}
+                )
+            elif 'funny' in message_lower:
+                tone = 'funny'
+                await db.users.update_one(
+                    {"_id": ObjectId(current_user["id"])},
+                    {"$set": {"chat_tone": "funny"}}
+                )
+            else:
+                tone = 'friendly'
+                await db.users.update_one(
+                    {"_id": ObjectId(current_user["id"])},
+                    {"$set": {"chat_tone": "friendly"}}
+                )
+        else:
+            tone = current_user.get('chat_tone', 'friendly')
+        
+        # Get user context: transactions and categories
+        transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
+        categories = await db.categories.find({"user_id": current_user["id"]}).to_list(100)
+        
+        # Calculate comprehensive financial data
+        total_income = sum(t["amount"] for t in transactions if t["type"] == "income")
+        total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense")
+        balance = total_income - total_expense
+        
+        # Get category-wise spending
+        category_spending = {}
+        for t in transactions:
+            if t["type"] == "expense":
+                cat = t["category_name"]
+                category_spending[cat] = category_spending.get(cat, 0) + t["amount"]
+        
+        # Get recent transactions (last 5)
+        recent_transactions = sorted(transactions, key=lambda x: x["date"], reverse=True)[:5]
+        recent_trans_text = "\n".join([
+            f"- {t['type'].title()}: ${t['amount']:.2f} for {t['category_name']}{' ('+t.get('income_source', '')+')' if t.get('income_source') else ''} on {t['date'][:10]}" 
+            for t in recent_transactions
+        ]) if recent_transactions else "No recent transactions"
+        
+        # Top spending categories
+        top_categories = sorted(category_spending.items(), key=lambda x: x[1], reverse=True)[:3]
+        top_spending_text = "\n".join([
+            f"- {cat}: ${amt:.2f}" for cat, amt in top_categories
+        ]) if top_categories else "No spending yet"
+        
+        # Available categories for quick reference
+        category_names = [cat['name'] for cat in categories]
+        
+        # Tone configurations
+        tone_configs = {
+            'strict': {
+                'personality': 'Direct, disciplined, and no-nonsense. You hold users accountable.',
+                'style': 'Brief and commanding. Use phrases like "You need to...", "Stop...", "Focus on..."',
+                'emoji': 'None or minimal (⚠️, 📊)'
+            },
+            'funny': {
+                'personality': 'Witty, humorous, and entertaining while being helpful. Make finance fun!',
+                'style': 'Light-hearted with jokes/puns. Use phrases like "Holy guacamole!", "Yikes!", "Cha-ching!"',
+                'emoji': 'Frequent (😄, 🤑, 💸, 🎉, 😅)'
+            },
+            'friendly': {
+                'personality': 'Warm, supportive, and encouraging. Like a caring friend.',
+                'style': 'Gentle and positive. Use phrases like "Great job!", "You\'re doing well!", "Let\'s try..."',
+                'emoji': 'Moderate (👋, 💪, ✨, 🎯)'
+            }
+        }
+        
+        current_tone = tone_configs.get(tone, tone_configs['friendly'])
+        
+        # Special handling for first message
+        if is_first_message:
+            intro_response = f"""Hey {current_user['full_name'].split()[0]}! 👋 I'm Monexa, your AI financial buddy.
+
+**Here's how I can help you:**
+
+• **Track & Analyze**: I monitor all your income, expenses, and spending patterns
+• **Smart Advice**: Get personalized financial wisdom based on your actual data  
+• **Quick Actions**: Add transactions, set budgets, or manage categories—all through chat!
+• **Financial Goals**: Let's work together on saving, budgeting, and building better habits
+
+**Current Status:**
+Balance: ${balance:.2f} | Income: ${total_income:.2f} | Expenses: ${total_expense:.2f}
+
+**Choose Your Chat Style:**
+How should I talk to you?
+
+• Type **"Strict"** - Direct and disciplined coaching
+• Type **"Funny"** - Humorous and entertaining advice  
+• Type **"Friendly"** - Warm and supportive guidance (current)
+
+**Try these commands:**
+- "Add $50 expense for food"
+- "Set monthly budget to $2000"  
+- "Show my spending this month"
+- "How am I doing?"
+
+What would you like to explore first?"""
+            
+            ai_message_doc = {
+                "user_id": current_user["id"],
+                "role": "assistant",
+                "text": intro_response,
+                "created_at": datetime.utcnow()
+            }
+            await db.chat_messages.insert_one(ai_message_doc)
+            return {"message": intro_response}
+        
+        # Build context based on tone
+        context = f"""You are Monexa, an AI financial buddy with {current_tone['personality']}
+
+TONE: {tone.upper()}
+{current_tone['style']}
+Emoji usage: {current_tone['emoji']}
+
+FINANCIAL DATA FOR {current_user['full_name'].split()[0]}:
+💰 Balance: ${balance:.2f}
+📈 Income: ${total_income:.2f}
+📉 Expenses: ${total_expense:.2f}
+📊 Transactions: {len(transactions)}
+
+RECENT ACTIVITY:
+{recent_trans_text}
+
+TOP SPENDING:
+{top_spending_text}
+
+RESPONSE FORMAT:
+- Keep under 3 sentences
+- Use {current_tone['style']}
+- Don't ask for data you already have
+- Provide insights from their actual spending
+
+Now respond to their message with your {tone} tone!"""
+
+        # Initialize AI chat
+        chat = LlmChat(
+            api_key=os.environ.get('EMERGENT_LLM_KEY'),
+            session_id=f"monexa_{current_user['id']}_{tone}",
+            system_message=context
+        ).with_model("openai", "gpt-5.2")
+        
+        # Send message to AI
+        user_msg = UserMessage(text=request.message)
+        ai_response = await chat.send_message(user_msg)
+        
+        # Save AI response
+        ai_message_doc = {
+            "user_id": current_user["id"],
+            "role": "assistant",
+            "text": ai_response,
+            "created_at": datetime.utcnow()
+        }
+        await db.chat_messages.insert_one(ai_message_doc)
+        
+        return {"message": ai_response}
+        
+    except Exception as e:
+        logger.error(f"AI chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process chat request")
+        # Get chat history to check if this is first message
+        existing_messages = await db.chat_messages.find({"user_id": current_user["id"]}).to_list(1000)
+        is_first_message = len(existing_messages) == 0
+        
+        # Save user message
+        user_message_doc = {
+            "user_id": current_user["id"],
+            "role": "user",
+            "text": request.message,
+            "created_at": datetime.utcnow()
+        }
+        await db.chat_messages.insert_one(user_message_doc)
+        
         # Check if user is setting tone preference
         message_lower = request.message.lower()
         if any(word in message_lower for word in ['strict', 'funny', 'friendly']):
