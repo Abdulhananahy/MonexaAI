@@ -13,9 +13,18 @@ import os
 import logging
 from pathlib import Path
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+import aiohttp
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Exchange Rate API (free tier)
+EXCHANGE_RATE_API_KEY = os.environ.get('EXCHANGE_RATE_API_KEY', 'free')  # Uses free tier if not set
+EXCHANGE_RATE_BASE_URL = "https://api.exchangerate-api.com/v4/latest/"
+
+# Stripe Configuration
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_mock')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_mock')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
