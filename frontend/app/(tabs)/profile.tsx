@@ -38,7 +38,7 @@ export default function ProfileScreen() {
       icon: 'person-outline',
       title: 'Personal Information',
       subtitle: user?.email,
-      onPress: () => {},
+      onPress: () => router.push('/personal-info' as any),
     },
     {
       icon: 'settings-outline',
