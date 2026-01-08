@@ -479,6 +479,21 @@ async def delete_category(category_id: str, current_user: dict = Depends(get_cur
 @api_router.post("/chat")
 async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_current_user)):
     try:
+        # Check AI message limit
+        can_send = await check_ai_message_limit(current_user["id"])
+        if not can_send:
+            subscription = await db.subscriptions.find_one({
+                "user_id": current_user["id"],
+                "status": "active"
+            })
+            plan_type = subscription.get("plan_type", "free") if subscription else "free"
+            limits = get_subscription_limits(plan_type)
+            
+            raise HTTPException(
+                status_code=429,
+                detail=f"Daily AI message limit reached ({limits['ai_messages_per_day']} messages). Upgrade to get more!"
+            )
+        
         # Get chat history to check if this is first message
         existing_messages = await db.chat_messages.find({"user_id": current_user["id"]}).to_list(1000)
         is_first_message = len(existing_messages) == 0
