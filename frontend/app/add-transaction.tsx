@@ -205,28 +205,50 @@ export default function AddTransactionScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Category *</Text>
+              <Text style={styles.label}>
+                {type === 'income' ? 'Income Source *' : 'Category *'}
+              </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.categoryList}>
-                  {categories.map((cat) => (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[
-                        styles.categoryChip,
-                        categoryId === cat.name && styles.categoryChipActive,
-                      ]}
-                      onPress={() => setCategoryId(cat.name)}
-                    >
-                      <Text
-                        style={[
-                          styles.categoryChipText,
-                          categoryId === cat.name && styles.categoryChipTextActive,
-                        ]}
-                      >
-                        {cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {type === 'income'
+                    ? INCOME_SOURCES.map((source) => (
+                        <TouchableOpacity
+                          key={source}
+                          style={[
+                            styles.categoryChip,
+                            incomeSource === source && styles.categoryChipActive,
+                          ]}
+                          onPress={() => setIncomeSource(source)}
+                        >
+                          <Text
+                            style={[
+                              styles.categoryChipText,
+                              incomeSource === source && styles.categoryChipTextActive,
+                            ]}
+                          >
+                            {source}
+                          </Text>
+                        </TouchableOpacity>
+                      ))
+                    : categories.map((cat) => (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[
+                            styles.categoryChip,
+                            categoryId === cat.name && styles.categoryChipActive,
+                          ]}
+                          onPress={() => setCategoryId(cat.name)}
+                        >
+                          <Text
+                            style={[
+                              styles.categoryChipText,
+                              categoryId === cat.name && styles.categoryChipTextActive,
+                            ]}
+                          >
+                            {cat.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                 </View>
               </ScrollView>
             </View>
