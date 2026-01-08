@@ -1002,8 +1002,88 @@ async def get_chat_history(current_user: dict = Depends(get_current_user)):
 
 @api_router.delete("/chat/history")
 async def clear_chat_history(current_user: dict = Depends(get_current_user)):
-    await db.chat_messages.delete_many({"user_id": current_user["id"]})
-    return {"message": "Chat history cleared"}
+    """Delete all chat messages for user"""
+    result = await db.chat_messages.delete_many({"user_id": current_user["id"]})
+    return {"message": "Chat history cleared", "deleted_count": result.deleted_count}
+
+@api_router.post("/chat/archive")
+async def archive_chat_session(current_user: dict = Depends(get_current_user)):
+    """Archive current chat and start fresh"""
+    # Get all current messages
+    messages = await db.chat_messages.find({"user_id": current_user["id"]}).to_list(10000)
+    
+    if len(messages) > 0:
+        # Create archive record
+        archive = {
+            "user_id": current_user["id"],
+            "messages": messages,
+            "archived_at": datetime.utcnow(),
+            "message_count": len(messages)
+        }
+        await db.chat_archives.insert_one(archive)
+        
+        # Clear current messages
+        await db.chat_messages.delete_many({"user_id": current_user["id"]})
+        
+        return {
+            "message": "Chat archived successfully",
+            "archived_messages": len(messages),
+            "archive_id": str(archive["_id"])
+        }
+    
+    return {"message": "No messages to archive"}
+
+@api_router.get("/chat/archives")
+async def get_chat_archives(current_user: dict = Depends(get_current_user)):
+    """Get list of archived chat sessions"""
+    archives = await db.chat_archives.find({"user_id": current_user["id"]}).sort("archived_at", -1).to_list(100)
+    
+    result = []
+    for archive in archives:
+        # Get first user message as preview
+        first_message = next((m for m in archive["messages"] if m["role"] == "user"), None)
+        preview = first_message["text"][:50] + "..." if first_message else "Empty chat"
+        
+        result.append({
+            "id": str(archive["_id"]),
+            "archived_at": archive["archived_at"].isoformat(),
+            "message_count": archive["message_count"],
+            "preview": preview
+        })
+    
+    return {"archives": result}
+
+@api_router.get("/chat/archives/{archive_id}")
+async def get_archived_chat(archive_id: str, current_user: dict = Depends(get_current_user)):
+    """Get specific archived chat"""
+    archive = await db.chat_archives.find_one({
+        "_id": ObjectId(archive_id),
+        "user_id": current_user["id"]
+    })
+    
+    if not archive:
+        raise HTTPException(status_code=404, detail="Archive not found")
+    
+    messages = [serialize_mongo_doc(m) for m in archive["messages"]]
+    
+    return {
+        "archive_id": str(archive["_id"]),
+        "archived_at": archive["archived_at"].isoformat(),
+        "messages": messages
+    }
+
+@api_router.delete("/chat/archives/{archive_id}")
+async def delete_archived_chat(archive_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete archived chat"""
+    result = await db.chat_archives.delete_one({
+        "_id": ObjectId(archive_id),
+        "user_id": current_user["id"]
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Archive not found")
+    
+    return {"message": "Archive deleted successfully"}
 
 # ============ ANALYTICS ROUTES ============
 
