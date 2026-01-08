@@ -85,18 +85,39 @@ export default function InsightsScreen() {
 
   const filterTransactionsByPeriod = (transactions: Transaction[]) => {
     const now = new Date();
+    now.setHours(23, 59, 59, 999); // End of today
+    
     const filtered = transactions.filter((t) => {
       const transDate = new Date(t.date);
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+      
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      
       const diffTime = now.getTime() - transDate.getTime();
       const diffDays = diffTime / (1000 * 3600 * 24);
 
       switch (timePeriod) {
+        case 'today':
+          return transDate >= startOfToday && transDate <= now;
+        case 'yesterday':
+          return transDate >= startOfYesterday && transDate < startOfToday;
         case 'week':
           return diffDays <= 7;
         case 'month':
           return diffDays <= 30;
         case 'year':
           return diffDays <= 365;
+        case 'custom':
+          if (customStartDate && customEndDate) {
+            const start = new Date(customStartDate);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(customEndDate);
+            end.setHours(23, 59, 59, 999);
+            return transDate >= start && transDate <= end;
+          }
+          return true;
         default:
           return true;
       }
