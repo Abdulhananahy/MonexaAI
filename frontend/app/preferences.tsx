@@ -114,7 +114,7 @@ export default function PreferencesScreen() {
                   styles.currencyChip,
                   currency === curr && styles.currencyChipActive,
                 ]}
-                onPress={() => setCurrency(curr)}
+                onPress={() => handleCurrencySelect(curr)}
               >
                 <Text
                   style={[
@@ -122,11 +122,28 @@ export default function PreferencesScreen() {
                     currency === curr && styles.currencyChipTextActive,
                   ]}
                 >
-                  {curr}
+                  {curr === 'CUSTOM' ? '+ Custom' : curr}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
+          
+          {showCustomInput && (
+            <View style={styles.customCurrencyContainer}>
+              <Text style={styles.label}>Enter Currency Code</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., BTC, ETH, CUSTOM"
+                value={customCurrency}
+                onChangeText={setCustomCurrency}
+                autoCapitalize="characters"
+                maxLength={10}
+              />
+              <Text style={styles.helperText}>
+                Enter your custom currency code (max 10 characters)
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
