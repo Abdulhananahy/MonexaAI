@@ -8,11 +8,12 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+import { useCallback } from 'react';
 
 interface AnalyticsSummary {
   balance: number;
@@ -29,9 +30,12 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadSummary();
-  }, []);
+  // Reload data when screen comes into focus (e.g., after currency change)
+  useFocusEffect(
+    useCallback(() => {
+      loadSummary();
+    }, [])
+  );
 
   const loadSummary = async () => {
     try {
