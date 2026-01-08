@@ -347,9 +347,14 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Authentication Flow (Splash, Onboarding, Login, Signup)"
+    - "Bottom Tab Navigation (Home, Transactions, AI Chat, Profile)"
+    - "Home Dashboard"
+    - "Add Transaction Screen"
+    - "AI Chat Screen"
   stuck_tasks: []
-  test_all: false
+  test_all: true
   test_priority: "high_first"
 
 agent_communication:
@@ -359,3 +364,5 @@ agent_communication:
     message: "Resuming from previous session. Services restarted. Now initiating comprehensive backend testing for all APIs: Auth (signup, login, forgot password), Transactions CRUD, Categories CRUD, AI Chat with GPT-5.2, Analytics & Insights, User Profile & Preferences."
   - agent: "testing"
     message: "BACKEND TESTING COMPLETE - ALL SYSTEMS OPERATIONAL: Conducted comprehensive testing of all 6 backend API groups with 22 individual test cases. 100% success rate achieved. All high-priority APIs (Authentication, Transactions, Categories, AI Chat) are fully functional. Medium-priority APIs (Analytics, User Profile) working perfectly. GPT-5.2 AI integration confirmed operational with emergentintegrations. MongoDB data persistence verified. JWT authentication working correctly. User data scoping and isolation confirmed. Currency conversion with real exchange rates functional. Ready for production use."
+  - agent: "main"
+    message: "Backend testing complete with 100% success rate. Now initiating comprehensive frontend testing via Playwright. Will test: Auth flow (signup/login), Tab navigation, Home dashboard with balance display, Transaction management (add/view/delete), AI Chat interface, Insights screen, Profile settings, and all user flows. Testing priority: High-priority screens first (Auth, Home, Transactions, AI Chat), then medium-priority (Insights, Profile, Settings)."
