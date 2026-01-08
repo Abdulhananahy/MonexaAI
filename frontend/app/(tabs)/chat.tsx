@@ -35,7 +35,20 @@ export default function ChatScreen() {
   const loadChatHistory = async () => {
     try {
       const response = await api.get('/chat/history');
-      setMessages(response.data);
+      const history = response.data;
+      
+      // If no chat history, add a friendly welcome message
+      if (history.length === 0) {
+        const welcomeMessage = {
+          id: 'welcome',
+          role: 'assistant',
+          text: "Hey! 👋 I'm Monexa, your financial buddy. I've got full visibility into your spending, income, and categories. Want some insights on your finances, or do you have any questions for me?",
+          created_at: new Date().toISOString(),
+        };
+        setMessages([welcomeMessage]);
+      } else {
+        setMessages(history);
+      }
     } catch (error) {
       console.error('Failed to load chat history:', error);
     } finally {
