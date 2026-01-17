@@ -1547,8 +1547,9 @@ async def create_promo_code(request: PromoCodeCreate):
         coupon = stripe.Coupon.create(**coupon_params)
         
         # Create promotion code with the custom code
+        # Note: stripe-python 14.x uses promotion dict with type and coupon
         promo_params = {
-            "coupon": coupon.id,
+            "promotion": {"type": "coupon", "coupon": coupon.id},
             "code": request.code,
         }
         
