@@ -40,8 +40,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "your-project-id-will-be-generated"
+        "projectId": "cd433b4d-d3cd-4a68-b7ac-b619bd11cdbc"
       }
-    }
+    },
+    "owner": "abdulhananahy"
   }
 }
