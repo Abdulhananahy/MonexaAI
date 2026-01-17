@@ -51,10 +51,16 @@ async def send_openai_message(system_message: str, user_message: str) -> str:
         return "I'm having trouble processing your request right now. Please try again."
 
 # MongoDB connection
+import certifi
+import ssl
 mongo_url = os.environ.get('MONGO_URL', '')
 db_name = os.environ.get('DB_NAME', 'monexa')
 if mongo_url:
-    client = AsyncIOMotorClient(mongo_url)
+    if '?' in mongo_url:
+        mongo_url_with_tls = mongo_url + '&tls=true&tlsAllowInvalidCertificates=true'
+    else:
+        mongo_url_with_tls = mongo_url + '?tls=true&tlsAllowInvalidCertificates=true'
+    client = AsyncIOMotorClient(mongo_url_with_tls)
     db = client[db_name]
 else:
     client = None
