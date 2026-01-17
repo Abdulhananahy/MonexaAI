@@ -12,7 +12,7 @@ from bson import ObjectId
 import os
 import logging
 from pathlib import Path
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import AsyncOpenAI
 import aiohttp
 import stripe
 
@@ -26,6 +26,26 @@ EXCHANGE_RATE_BASE_URL = "https://api.exchangerate-api.com/v4/latest/"
 # Stripe Configuration
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY')
+
+# OpenAI Configuration
+openai_client = AsyncOpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+
+async def send_openai_message(system_message: str, user_message: str) -> str:
+    """Send a message to OpenAI and get a response"""
+    try:
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=500,
+            temperature=0.7
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        logger.error(f"OpenAI error: {str(e)}")
+        return "I'm having trouble processing your request right now. Please try again."
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -609,14 +629,7 @@ Updated stats: Income ${total_income:.2f}, Expenses ${total_expense:.2f}
 
 Respond with ONE supportive sentence about this action."""
             
-            chat = LlmChat(
-                api_key=os.environ.get('EMERGENT_LLM_KEY'),
-                session_id=f"monexa_{current_user['id']}_action",
-                system_message=simple_context
-            ).with_model("openai", "gpt-5.2")
-            
-            user_msg = UserMessage(text=action_response)
-            ai_response = await chat.send_message(user_msg)
+            ai_response = await send_openai_message(simple_context, action_response)
             
             full_response = f"{action_response} {ai_response}"
             
@@ -770,216 +783,8 @@ RESPONSE FORMAT:
 
 Now respond to their message with your {tone} tone!"""
 
-        # Initialize AI chat
-        chat = LlmChat(
-            api_key=os.environ.get('EMERGENT_LLM_KEY'),
-            session_id=f"monexa_{current_user['id']}_{tone}",
-            system_message=context
-        ).with_model("openai", "gpt-5.2")
-        
-        # Send message to AI
-        user_msg = UserMessage(text=request.message)
-        ai_response = await chat.send_message(user_msg)
-        
-        # Save AI response
-        ai_message_doc = {
-            "user_id": current_user["id"],
-            "role": "assistant",
-            "text": ai_response,
-            "created_at": datetime.utcnow()
-        }
-        await db.chat_messages.insert_one(ai_message_doc)
-        
-        return {"message": ai_response}
-        
-    except Exception as e:
-        logger.error(f"AI chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to process chat request")
-        # Get chat history to check if this is first message
-        existing_messages = await db.chat_messages.find({"user_id": current_user["id"]}).to_list(1000)
-        is_first_message = len(existing_messages) == 0
-        
-        # Save user message
-        user_message_doc = {
-            "user_id": current_user["id"],
-            "role": "user",
-            "text": request.message,
-            "created_at": datetime.utcnow()
-        }
-        await db.chat_messages.insert_one(user_message_doc)
-        
-        # Check if user is setting tone preference
-        message_lower = request.message.lower()
-        if any(word in message_lower for word in ['strict', 'funny', 'friendly']):
-            if 'strict' in message_lower:
-                tone = 'strict'
-                await db.users.update_one(
-                    {"_id": ObjectId(current_user["id"])},
-                    {"$set": {"chat_tone": "strict"}}
-                )
-            elif 'funny' in message_lower:
-                tone = 'funny'
-                await db.users.update_one(
-                    {"_id": ObjectId(current_user["id"])},
-                    {"$set": {"chat_tone": "funny"}}
-                )
-            else:
-                tone = 'friendly'
-                await db.users.update_one(
-                    {"_id": ObjectId(current_user["id"])},
-                    {"$set": {"chat_tone": "friendly"}}
-                )
-        else:
-            tone = current_user.get('chat_tone', 'friendly')
-        
-        # Get user context: transactions and categories
-        transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
-        categories = await db.categories.find({"user_id": current_user["id"]}).to_list(100)
-        
-        # Calculate comprehensive financial data
-        total_income = sum(t["amount"] for t in transactions if t["type"] == "income")
-        total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense")
-        balance = total_income - total_expense
-        
-        # Get category-wise spending
-        category_spending = {}
-        for t in transactions:
-            if t["type"] == "expense":
-                cat = t["category_name"]
-                category_spending[cat] = category_spending.get(cat, 0) + t["amount"]
-        
-        # Get recent transactions (last 5)
-        recent_transactions = sorted(transactions, key=lambda x: x["date"], reverse=True)[:5]
-        recent_trans_text = "\n".join([
-            f"- {t['type'].title()}: ${t['amount']:.2f} for {t['category_name']}{' ('+t.get('income_source', '')+')' if t.get('income_source') else ''} on {t['date'][:10]}" 
-            for t in recent_transactions
-        ]) if recent_transactions else "No recent transactions"
-        
-        # Top spending categories
-        top_categories = sorted(category_spending.items(), key=lambda x: x[1], reverse=True)[:3]
-        top_spending_text = "\n".join([
-            f"- {cat}: ${amt:.2f}" for cat, amt in top_categories
-        ]) if top_categories else "No spending yet"
-        
-        # Available categories for quick reference
-        category_names = [cat['name'] for cat in categories]
-        
-        # Tone configurations
-        tone_configs = {
-            'strict': {
-                'personality': 'Direct, disciplined, and no-nonsense. You hold users accountable.',
-                'style': 'Brief and commanding. Use phrases like "You need to...", "Stop...", "Focus on..."',
-                'emoji': 'None or minimal (⚠️, 📊)'
-            },
-            'funny': {
-                'personality': 'Witty, humorous, and entertaining while being helpful. Make finance fun!',
-                'style': 'Light-hearted with jokes/puns. Use phrases like "Holy guacamole!", "Yikes!", "Cha-ching!"',
-                'emoji': 'Frequent (😄, 🤑, 💸, 🎉, 😅)'
-            },
-            'friendly': {
-                'personality': 'Warm, supportive, and encouraging. Like a caring friend.',
-                'style': 'Gentle and positive. Use phrases like "Great job!", "You\'re doing well!", "Let\'s try..."',
-                'emoji': 'Moderate (👋, 💪, ✨, 🎯)'
-            }
-        }
-        
-        current_tone = tone_configs.get(tone, tone_configs['friendly'])
-        
-        # Special handling for first message
-        if is_first_message:
-            intro_response = f"""Hey {current_user['full_name'].split()[0]}! 👋 I'm Monexa, your AI financial buddy.
-
-**Here's how I can help you:**
-
-• **Track & Analyze**: I monitor all your income, expenses, and spending patterns
-• **Smart Advice**: Get personalized financial wisdom based on your actual data  
-• **Quick Actions**: Add transactions, set budgets, or manage categories—all through chat!
-• **Financial Goals**: Let's work together on saving, budgeting, and building better habits
-
-**Current Status:**
-Balance: ${balance:.2f} | Income: ${total_income:.2f} | Expenses: ${total_expense:.2f}
-
-**Choose Your Chat Style:**
-How should I talk to you?
-
-• Type **"Strict"** - Direct and disciplined coaching
-• Type **"Funny"** - Humorous and entertaining advice  
-• Type **"Friendly"** - Warm and supportive guidance (current)
-
-**Try these commands:**
-- "Add $50 expense for food"
-- "Set monthly budget to $2000"  
-- "Show my spending this month"
-- "How am I doing?"
-
-What would you like to explore first?"""
-            
-            ai_message_doc = {
-                "user_id": current_user["id"],
-                "role": "assistant",
-                "text": intro_response,
-                "created_at": datetime.utcnow()
-            }
-            await db.chat_messages.insert_one(ai_message_doc)
-            return {"message": intro_response}
-        
-        # Build context based on tone
-        context = f"""You are Monexa, an AI financial buddy with {current_tone['personality']}
-
-TONE: {tone.upper()}
-{current_tone['style']}
-Emoji usage: {current_tone['emoji']}
-
-FINANCIAL DATA FOR {current_user['full_name'].split()[0]}:
-💰 Balance: ${balance:.2f}
-📈 Income: ${total_income:.2f}
-📉 Expenses: ${total_expense:.2f}
-📊 Transactions: {len(transactions)}
-
-RECENT ACTIVITY:
-{recent_trans_text}
-
-TOP SPENDING:
-{top_spending_text}
-
-AVAILABLE CATEGORIES: {', '.join(category_names)}
-
-SPECIAL CAPABILITIES - You can help users take actions:
-1. Add transactions: "add $50 expense for food", "log $1000 income from salary"
-2. Set budgets: "set budget to $2000", "monthly budget $1500"
-3. Create categories: "add category coffee", "new category entertainment"
-4. Financial queries: "how much did I spend?", "show my income"
-
-DETECTION RULES - When user wants to:
-- ADD EXPENSE: "add", "spent", "bought", "paid" + amount + category
-- ADD INCOME: "earned", "received", "got paid", "income" + amount + source
-- SET BUDGET: "budget", "limit" + amount
-- CREATE CATEGORY: "add category", "new category" + name
-- QUERY DATA: "how much", "show me", "what did I", "spending"
-
-RESPONSE FORMAT:
-1. Detect if action is requested
-2. If action: Confirm what you'll do (I'll add/set/create...) + provide transaction details
-3. Keep under 3 sentences
-4. Use {current_tone['style']}
-
-If user asks to add/modify data, format response like:
-"✅ [Action confirmed]. [Brief insight]. [Optional question]"
-
-Example: "✅ Added $50 expense for Food. That brings your food spending to $150 this month. Want to set a food budget?"
-
-Now respond to their message with your {tone} tone!"""
-
-        # Initialize AI chat
-        chat = LlmChat(
-            api_key=os.environ.get('EMERGENT_LLM_KEY'),
-            session_id=f"monexa_{current_user['id']}_{tone}",
-            system_message=context
-        ).with_model("openai", "gpt-5.2")
-        
-        # Send message to AI
-        user_msg = UserMessage(text=request.message)
-        ai_response = await chat.send_message(user_msg)
+        # Send message to OpenAI
+        ai_response = await send_openai_message(context, request.message)
         
         # Save AI response
         ai_message_doc = {
@@ -1151,13 +956,10 @@ Number of Transactions: {len(transactions)}
 
 Format as a simple list, no numbering."""
 
-        chat = LlmChat(
-            api_key=os.environ.get('EMERGENT_LLM_KEY'),
-            session_id=f"insights_{current_user['id']}",
-            system_message="You are a helpful financial assistant. Provide brief, supportive insights."
-        ).with_model("openai", "gpt-5.2")
-        
-        insights_text = await chat.send_message(UserMessage(text=prompt))
+        insights_text = await send_openai_message(
+            "You are a helpful financial assistant. Provide brief, supportive insights.",
+            prompt
+        )
         insights = [line.strip() for line in insights_text.split('\n') if line.strip()]
         
         return {"insights": insights[:3]}
