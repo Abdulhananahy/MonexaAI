@@ -1,11 +1,18 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
+const getApiUrl = () => {
+  if (Platform.OS === 'web') {
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+    return backendUrl ? `${backendUrl}/api` : '/api';
+  }
+  const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+  return `${backendUrl}/api`;
+};
 
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: getApiUrl(),
   headers: {
     'Content-Type': 'application/json',
   },

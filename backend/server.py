@@ -48,9 +48,15 @@ async def send_openai_message(system_message: str, user_message: str) -> str:
         return "I'm having trouble processing your request right now. Please try again."
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+mongo_url = os.environ.get('MONGO_URL', '')
+db_name = os.environ.get('DB_NAME', 'monexa')
+if mongo_url:
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[db_name]
+else:
+    client = None
+    db = None
+    print("WARNING: MONGO_URL not set. Database features will not work.")
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'monexa_jwt_secret_key_2025')
@@ -1375,4 +1381,5 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    if client:
+        client.close()
