@@ -10,7 +10,7 @@ const getApiUrl = () => {
   if (Platform.OS === 'web') {
     return '/api';
   }
-  return 'http://localhost:8000/api';
+  return 'https://c71a929c-259f-429a-8677-9be12cf992ec-00-11vr14qbni1fh.pike.replit.dev/api';
 };
 
 const api = axios.create({

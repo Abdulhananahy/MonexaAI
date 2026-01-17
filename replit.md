@@ -66,6 +66,9 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Configured secrets: MONGO_URL, JWT_SECRET_KEY, OPENAI_API_KEY
 - Fixed MongoDB Atlas SSL connection with TLS options
 - Fixed bcrypt compatibility issue (downgraded to 4.0.1)
+- Fixed AuthContext to use centralized api.ts utility for proper URL handling
+- Fixed splash image reference in app.json (splash-image.png instead of splash-icon.png)
+- Configured mobile API URL to use public Replit domain for Expo Go compatibility
 
 ## User Preferences
 - Mobile-first development approach

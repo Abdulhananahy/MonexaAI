@@ -1,9 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import Constants from 'expo-constants';
-
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
+import api from '../utils/api';
 
 interface User {
   id: string;
@@ -51,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/login`, {
+      const response = await api.post('/auth/login', {
         email,
         password,
       });
@@ -70,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (full_name: string, email: string, password: string) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/signup`, {
+      const response = await api.post('/auth/signup', {
         full_name,
         email,
         password,
@@ -99,11 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!token) return;
       
-      const response = await axios.get(`${API_URL}/api/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await api.get('/profile');
       
       const userData = response.data;
       await AsyncStorage.setItem('user', JSON.stringify(userData));
