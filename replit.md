@@ -71,9 +71,11 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Configured mobile API URL to use public Replit domain for Expo Go compatibility
 - Removed incorrect EXPO_PUBLIC_BACKEND_URL env variable that was pointing to localhost:8000
 - Fixed API configuration to use proxy path (/api) for web and public domain for mobile
-- Added number formatting utility (formatNumber) for comma separators throughout the app
+- Added number formatting utility (formatNumber) for comma separators with 2 decimal places
 - Added income/expense category types with tabbed UI in categories management screen
-- Fixed AI chat to not show error message when transaction action succeeds but OpenAI fails
+- Backend defaults legacy categories without type field to 'expense' for backward compatibility
+- Frontend filters categories by type in add-transaction, with fallback for legacy categories
+- Fixed AI chat to only show action success message when transaction succeeds but OpenAI fails
 - Fixed logout functionality for web using Platform.OS check with window.confirm()
 
 ## User Preferences
