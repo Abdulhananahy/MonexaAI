@@ -64,6 +64,8 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Added API proxy in Metro config to route `/api` requests to backend on port 8000
 - Fixed web navigation by using Link components from expo-router
 - Configured secrets: MONGO_URL, JWT_SECRET_KEY, OPENAI_API_KEY
+- Fixed MongoDB Atlas SSL connection with TLS options
+- Fixed bcrypt compatibility issue (downgraded to 4.0.1)
 
 ## User Preferences
 - Mobile-first development approach
