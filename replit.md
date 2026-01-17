@@ -82,6 +82,14 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Added promo code support to checkout with validation and application
 - Added promo code management endpoints (create, validate, list)
 - Upgrade screen now includes promo code input field with validation
+- Charts are now gated behind subscription (free users see upgrade prompt, Starter/Pro see charts)
+- Fixed Stripe credential fetching to read from both 'secrets' and 'settings' keys
+- Fixed promo code validation to accept Query parameters matching frontend usage
+
+## Subscription Tiers
+- **Free**: 10 AI messages/day, no charts, no export
+- **Starter ($3/mo)**: 50 AI messages/day, charts enabled, no export
+- **Pro ($9/mo)**: Unlimited AI messages, charts enabled, export enabled
 
 ## User Preferences
 - Mobile-first development approach
