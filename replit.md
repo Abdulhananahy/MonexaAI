@@ -69,6 +69,8 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Fixed AuthContext to use centralized api.ts utility for proper URL handling
 - Fixed splash image reference in app.json (splash-image.png instead of splash-icon.png)
 - Configured mobile API URL to use public Replit domain for Expo Go compatibility
+- Removed incorrect EXPO_PUBLIC_BACKEND_URL env variable that was pointing to localhost:8000
+- Fixed API configuration to use proxy path (/api) for web and public domain for mobile
 
 ## User Preferences
 - Mobile-first development approach

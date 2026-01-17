@@ -30,7 +30,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd frontend && EXPO_PACKAGER_PROXY_URL=http://0.0.0.0:5000 npx expo start --web --port 5000 --host lan"
+args = "cd frontend && CI=1 EXPO_NO_INTERACTIVE=1 npx expo start --web --port 5000 --host lan"
 waitForPort = 5000
 
 [[workflows.workflow]]
@@ -50,17 +50,12 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 5001
-externalPort = 3000
-
-[[ports]]
 localPort = 8000
 externalPort = 8000
 
 [userenv]
 
 [userenv.shared]
-EXPO_PUBLIC_BACKEND_URL = "http://localhost:8000"
 DB_NAME = "monexa"
 
 [deployment]

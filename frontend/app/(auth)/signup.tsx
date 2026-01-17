@@ -40,7 +40,7 @@ export default function SignupScreen() {
       await signup(fullName, email, password);
       router.replace('/(tabs)/home');
     } catch (error: any) {
-      Alert.alert('Signup Failed', error.message);
+      Alert.alert('Signup Failed', error.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
