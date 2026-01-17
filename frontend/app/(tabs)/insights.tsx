@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+import { formatNumber } from '../../utils/format';
 import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
 
 const { width } = Dimensions.get('window');
@@ -272,7 +273,7 @@ export default function InsightsScreen() {
               <View style={styles.pieCenter}>
                 <Text style={styles.pieCenterText}>Total</Text>
                 <Text style={styles.pieCenterValue}>
-                  {user?.currency} {analytics.total_expense.toFixed(0)}
+                  {user?.currency} {formatNumber(analytics.total_expense)}
                 </Text>
               </View>
             )}
@@ -283,7 +284,7 @@ export default function InsightsScreen() {
                 <View style={[styles.legendColor, { backgroundColor: item.color }]} />
                 <Text style={styles.legendText}>{item.name}</Text>
                 <Text style={styles.legendValue}>
-                  {user?.currency} {item.value.toFixed(0)}
+                  {user?.currency} {formatNumber(item.value)}
                 </Text>
               </View>
             ))}
@@ -553,19 +554,19 @@ export default function InsightsScreen() {
               <View style={styles.statCard}>
                 <Text style={styles.statLabel}>Current Balance</Text>
                 <Text style={styles.statValue}>
-                  {user?.currency || 'USD'} {analytics.balance.toFixed(2)}
+                  {user?.currency || 'USD'} {formatNumber(analytics.balance)}
                 </Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statLabel}>Total Income</Text>
                 <Text style={[styles.statValue, styles.incomeValue]}>
-                  {analytics.total_income.toFixed(2)}
+                  {formatNumber(analytics.total_income)}
                 </Text>
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statLabel}>Total Expenses</Text>
                 <Text style={[styles.statValue, styles.expenseValue]}>
-                  {analytics.total_expense.toFixed(2)}
+                  {formatNumber(analytics.total_expense)}
                 </Text>
               </View>
             </View>

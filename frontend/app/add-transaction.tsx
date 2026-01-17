@@ -20,6 +20,7 @@ import { format } from 'date-fns';
 interface Category {
   id: string;
   name: string;
+  type: string;
 }
 
 // Common income sources
@@ -51,22 +52,24 @@ export default function AddTransactionScreen() {
   }, []);
 
   useEffect(() => {
-    // Reset selection when type changes
+    // Reset selection when type changes - treat missing type as 'expense'
+    const filteredCats = categories.filter(c => (c.type || 'expense') === type);
     if (type === 'income') {
       setIncomeSource(INCOME_SOURCES[0]);
-      setCategoryId('');
+      setCategoryId(filteredCats.length > 0 ? filteredCats[0].name : '');
     } else {
-      setCategoryId(categories.length > 0 ? categories[0].name : '');
+      setCategoryId(filteredCats.length > 0 ? filteredCats[0].name : '');
       setIncomeSource('');
     }
-  }, [type]);
+  }, [type, categories]);
 
   const loadCategories = async () => {
     try {
       const response = await api.get('/categories');
       setCategories(response.data);
-      if (response.data.length > 0) {
-        setCategoryId(response.data[0].name);
+      const expenseCategories = response.data.filter((c: Category) => c.type === 'expense');
+      if (expenseCategories.length > 0) {
+        setCategoryId(expenseCategories[0].name);
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -81,13 +84,13 @@ export default function AddTransactionScreen() {
       return;
     }
 
-    if (type === 'expense' && !categoryId) {
-      Alert.alert('Error', 'Please select a category');
-      return;
-    }
-
-    if (type === 'income' && !incomeSource) {
-      Alert.alert('Error', 'Please select an income source');
+    if (!categoryId) {
+      const msg = `Please select a category or create one in Profile → Categories first`;
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Error', msg);
+      }
       return;
     }
 
@@ -106,11 +109,9 @@ export default function AddTransactionScreen() {
         note: note || null,
       };
 
-      if (type === 'income') {
+      payload.category_name = categoryId;
+      if (type === 'income' && incomeSource) {
         payload.income_source = incomeSource;
-        payload.category_name = 'Salary'; // Default category for income
-      } else {
-        payload.category_name = categoryId;
       }
 
       await api.post('/transactions', payload);
@@ -205,53 +206,66 @@ export default function AddTransactionScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                {type === 'income' ? 'Income Source *' : 'Category *'}
-              </Text>
+              <Text style={styles.label}>Category *</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.categoryList}>
-                  {type === 'income'
-                    ? INCOME_SOURCES.map((source) => (
-                        <TouchableOpacity
-                          key={source}
+                  {categories.filter(cat => (cat.type || 'expense') === type).length > 0 ? (
+                    categories.filter(cat => (cat.type || 'expense') === type).map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[
+                          styles.categoryChip,
+                          categoryId === cat.name && styles.categoryChipActive,
+                        ]}
+                        onPress={() => setCategoryId(cat.name)}
+                      >
+                        <Text
                           style={[
-                            styles.categoryChip,
-                            incomeSource === source && styles.categoryChipActive,
+                            styles.categoryChipText,
+                            categoryId === cat.name && styles.categoryChipTextActive,
                           ]}
-                          onPress={() => setIncomeSource(source)}
                         >
-                          <Text
-                            style={[
-                              styles.categoryChipText,
-                              incomeSource === source && styles.categoryChipTextActive,
-                            ]}
-                          >
-                            {source}
-                          </Text>
-                        </TouchableOpacity>
-                      ))
-                    : categories.map((cat) => (
-                        <TouchableOpacity
-                          key={cat.id}
-                          style={[
-                            styles.categoryChip,
-                            categoryId === cat.name && styles.categoryChipActive,
-                          ]}
-                          onPress={() => setCategoryId(cat.name)}
-                        >
-                          <Text
-                            style={[
-                              styles.categoryChipText,
-                              categoryId === cat.name && styles.categoryChipTextActive,
-                            ]}
-                          >
-                            {cat.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.noCategoriesText}>
+                      No {type} categories. Add one in Profile → Categories.
+                    </Text>
+                  )}
                 </View>
               </ScrollView>
             </View>
+
+            {type === 'income' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Income Source (Optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.categoryList}>
+                    {INCOME_SOURCES.map((source) => (
+                      <TouchableOpacity
+                        key={source}
+                        style={[
+                          styles.categoryChip,
+                          incomeSource === source && styles.categoryChipActive,
+                        ]}
+                        onPress={() => setIncomeSource(source)}
+                      >
+                        <Text
+                          style={[
+                            styles.categoryChipText,
+                            incomeSource === source && styles.categoryChipTextActive,
+                          ]}
+                        >
+                          {source}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Date</Text>
@@ -393,6 +407,12 @@ const styles = StyleSheet.create({
   },
   categoryChipTextActive: {
     color: '#FFFFFF',
+  },
+  noCategoriesText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    paddingVertical: 8,
   },
   dateInput: {
     flexDirection: 'row',

@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+import { formatNumber } from '../../utils/format';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 
 interface Transaction {
@@ -195,7 +196,7 @@ export default function TransactionsScreen() {
                         <View style={styles.summaryBadge}>
                           <Ionicons name="arrow-down" size={14} color="#10B981" />
                           <Text style={styles.incomeSummary}>
-                            {user?.currency} {group.totalIncome.toFixed(2)}
+                            {user?.currency} {formatNumber(group.totalIncome)}
                           </Text>
                         </View>
                       )}
@@ -203,7 +204,7 @@ export default function TransactionsScreen() {
                         <View style={styles.summaryBadge}>
                           <Ionicons name="arrow-up" size={14} color="#EF4444" />
                           <Text style={styles.expenseSummary}>
-                            {user?.currency} {group.totalExpense.toFixed(2)}
+                            {user?.currency} {formatNumber(group.totalExpense)}
                           </Text>
                         </View>
                       )}
@@ -254,7 +255,7 @@ export default function TransactionsScreen() {
                                 txn.type === 'income' ? styles.incomeAmount : styles.expenseAmount,
                               ]}
                             >
-                              {txn.type === 'income' ? '+' : '-'}{user?.currency} {txn.amount.toFixed(2)}
+                              {txn.type === 'income' ? '+' : '-'}{user?.currency} {formatNumber(txn.amount)}
                             </Text>
                           </View>
                         </TouchableOpacity>

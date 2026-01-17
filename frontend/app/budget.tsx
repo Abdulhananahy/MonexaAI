@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { formatNumber } from '../utils/format';
 
 type BudgetPeriod = 'day' | 'week' | 'month';
 
@@ -134,7 +135,7 @@ export default function BudgetScreen() {
             <View style={styles.previewRow}>
               <Text style={styles.previewLabel}>Limit:</Text>
               <Text style={styles.previewValue}>
-                {user?.currency || 'USD'} {parseFloat(budget).toFixed(2)}
+                {user?.currency || 'USD'} {formatNumber(parseFloat(budget))}
               </Text>
             </View>
             {period !== 'month' && (
@@ -142,7 +143,7 @@ export default function BudgetScreen() {
                 <Text style={styles.previewLabel}>Monthly:</Text>
                 <Text style={styles.previewValue}>
                   {user?.currency || 'USD'}{' '}
-                  {(parseFloat(budget) * (period === 'week' ? 4 : 30)).toFixed(2)}
+                  {formatNumber(parseFloat(budget) * (period === 'week' ? 4 : 30))}
                 </Text>
               </View>
             )}

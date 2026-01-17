@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+import { formatNumber } from '../../utils/format';
 import { useCallback } from 'react';
 
 interface AnalyticsSummary {
@@ -83,7 +84,7 @@ export default function HomeScreen() {
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Current Balance</Text>
           <Text style={styles.balanceAmount}>
-            {user?.currency || 'USD'} {summary?.balance?.toFixed(2) || '0.00'}
+            {user?.currency || 'USD'} {formatNumber(summary?.balance || 0)}
           </Text>
           <View style={styles.balanceDetails}>
             <View style={styles.balanceItem}>
@@ -91,7 +92,7 @@ export default function HomeScreen() {
               <View>
                 <Text style={styles.balanceItemLabel}>Income</Text>
                 <Text style={styles.balanceItemValue}>
-                  {summary?.total_income?.toFixed(2) || '0.00'}
+                  {formatNumber(summary?.total_income || 0)}
                 </Text>
               </View>
             </View>
@@ -100,7 +101,7 @@ export default function HomeScreen() {
               <View>
                 <Text style={styles.balanceItemLabel}>Expenses</Text>
                 <Text style={styles.balanceItemValue}>
-                  {summary?.total_expense?.toFixed(2) || '0.00'}
+                  {formatNumber(summary?.total_expense || 0)}
                 </Text>
               </View>
             </View>
@@ -159,7 +160,7 @@ export default function HomeScreen() {
                     <Text style={styles.categoryName}>{cat.name}</Text>
                   </View>
                   <Text style={styles.categoryAmount}>
-                    {user?.currency || 'USD'} {cat.amount.toFixed(2)}
+                    {user?.currency || 'USD'} {formatNumber(cat.amount)}
                   </Text>
                 </View>
               ))}

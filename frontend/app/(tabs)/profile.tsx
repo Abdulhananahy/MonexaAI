@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,22 +16,29 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/(auth)/login');
+  const handleLogout = async () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) {
+        await logout();
+        router.replace('/(auth)/login');
+      }
+    } else {
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: async () => {
+              await logout();
+              router.replace('/(auth)/login');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const menuItems = [

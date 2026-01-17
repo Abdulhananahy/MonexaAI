@@ -139,11 +139,13 @@ class Category(BaseModel):
     id: Optional[str] = None
     user_id: str
     name: str
+    type: str = "expense"  # "income" or "expense"
     icon: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class CategoryCreate(BaseModel):
     name: str
+    type: str = "expense"  # "income" or "expense"
     icon: Optional[str] = None
 
 class ChatMessage(BaseModel):
@@ -469,7 +471,13 @@ async def delete_transaction(transaction_id: str, current_user: dict = Depends(g
 @api_router.get("/categories", response_model=List[Category])
 async def get_categories(current_user: dict = Depends(get_current_user)):
     categories = await db.categories.find({"user_id": current_user["id"]}).to_list(1000)
-    return [serialize_mongo_doc(c) for c in categories]
+    result = []
+    for c in categories:
+        doc = serialize_mongo_doc(c)
+        if 'type' not in doc or not doc['type']:
+            doc['type'] = 'expense'
+        result.append(doc)
+    return result
 
 @api_router.post("/categories", response_model=Category)
 async def create_category(category: CategoryCreate, current_user: dict = Depends(get_current_user)):
@@ -646,7 +654,11 @@ Respond with ONE supportive sentence about this action."""
             
             ai_response = await send_openai_message(simple_context, action_response)
             
-            full_response = f"{action_response} {ai_response}"
+            # Only append AI response if it's not an error message
+            if ai_response and "trouble processing" not in ai_response:
+                full_response = f"{action_response} {ai_response}"
+            else:
+                full_response = action_response
             
             ai_message_doc = {
                 "user_id": current_user["id"],
