@@ -7,10 +7,8 @@ const getApiUrl = () => {
   if (backendUrl) {
     return `${backendUrl}/api`;
   }
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const protocol = window.location.protocol;
-    const host = window.location.hostname;
-    return `${protocol}//${host}:8000/api`;
+  if (Platform.OS === 'web') {
+    return '/api';
   }
   return 'http://localhost:8000/api';
 };

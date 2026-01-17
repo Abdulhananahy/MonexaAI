@@ -61,6 +61,9 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Made MongoDB and OpenAI connections optional (graceful degradation)
 - Configured Expo Metro bundler for Replit's port 5000 requirement
 - Added email-validator package for pydantic email field support
+- Added API proxy in Metro config to route `/api` requests to backend on port 8000
+- Fixed web navigation by using Link components from expo-router
+- Configured secrets: MONGO_URL, JWT_SECRET_KEY, OPENAI_API_KEY
 
 ## User Preferences
 - Mobile-first development approach

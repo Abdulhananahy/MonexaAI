@@ -1,13 +1,11 @@
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
-  const router = useRouter();
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -39,19 +37,17 @@ export default function OnboardingScreen() {
       </View>
       
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={styles.primaryButton}
-          onPress={() => router.push('/(auth)/signup')}
-        >
-          <Text style={styles.primaryButtonText}>Get Started</Text>
-        </TouchableOpacity>
+        <Link href="/(auth)/signup" asChild>
+          <Pressable style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Get Started</Text>
+          </Pressable>
+        </Link>
         
-        <TouchableOpacity 
-          style={styles.secondaryButton}
-          onPress={() => router.push('/(auth)/login')}
-        >
-          <Text style={styles.secondaryButtonText}>I already have an account</Text>
-        </TouchableOpacity>
+        <Link href="/(auth)/login" asChild>
+          <Pressable style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>I already have an account</Text>
+          </Pressable>
+        </Link>
       </View>
     </SafeAreaView>
   );
