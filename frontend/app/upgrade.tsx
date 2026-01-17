@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, Linking, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,9 @@ export default function UpgradeScreen() {
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro'>('pro');
   const [loading, setLoading] = useState(false);
   const [publishableKey, setPublishableKey] = useState('');
+  const [promoCode, setPromoCode] = useState('');
+  const [promoValid, setPromoValid] = useState<boolean | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState('');
 
   useEffect(() => {
     loadStripeConfig();
@@ -54,6 +57,24 @@ export default function UpgradeScreen() {
     },
   ];
 
+  const validatePromoCode = async () => {
+    if (!promoCode.trim()) return;
+    
+    try {
+      const response = await api.post('/promo-codes/validate', null, { params: { code: promoCode } });
+      if (response.data.valid) {
+        setPromoValid(true);
+        setPromoDiscount(response.data.discount);
+      } else {
+        setPromoValid(false);
+        setPromoDiscount('');
+      }
+    } catch (error) {
+      setPromoValid(false);
+      setPromoDiscount('');
+    }
+  };
+
   const handleWebCheckout = async () => {
     if (!publishableKey) {
       Alert.alert('Error', 'Payment system not configured. Please try again later.');
@@ -62,15 +83,19 @@ export default function UpgradeScreen() {
 
     setLoading(true);
     try {
-      // For web, we'll create a Stripe Checkout session
-      const response = await api.post('/subscription/create-checkout-session', {
+      const payload: any = {
         plan_type: selectedPlan,
         success_url: window.location.origin + '/payment-success',
         cancel_url: window.location.origin + '/upgrade',
-      });
+      };
+      
+      if (promoCode.trim() && promoValid) {
+        payload.promo_code = promoCode.trim();
+      }
+      
+      const response = await api.post('/subscription/create-checkout-session', payload);
 
       if (response.data.checkout_url) {
-        // Redirect to Stripe Checkout
         window.location.href = response.data.checkout_url;
       }
     } catch (error: any) {
@@ -168,6 +193,41 @@ export default function UpgradeScreen() {
               </TouchableOpacity>
             ))}
           </View>
+
+          {isWeb && (
+            <View style={styles.promoContainer}>
+              <Text style={styles.promoLabel}>Have a promo code?</Text>
+              <View style={styles.promoInputRow}>
+                <TextInput
+                  style={[
+                    styles.promoInput,
+                    promoValid === true && styles.promoInputValid,
+                    promoValid === false && styles.promoInputInvalid,
+                  ]}
+                  placeholder="Enter promo code"
+                  value={promoCode}
+                  onChangeText={(text) => {
+                    setPromoCode(text.toUpperCase());
+                    setPromoValid(null);
+                    setPromoDiscount('');
+                  }}
+                  autoCapitalize="characters"
+                />
+                <TouchableOpacity style={styles.promoApplyButton} onPress={validatePromoCode}>
+                  <Text style={styles.promoApplyText}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+              {promoValid === true && (
+                <View style={styles.promoSuccess}>
+                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  <Text style={styles.promoSuccessText}>{promoDiscount} applied!</Text>
+                </View>
+              )}
+              {promoValid === false && (
+                <Text style={styles.promoError}>Invalid or expired promo code</Text>
+              )}
+            </View>
+          )}
 
           {!isWeb && (
             <View style={styles.webNotice}>
@@ -375,5 +435,70 @@ const styles = StyleSheet.create({
   securityText: {
     fontSize: 13,
     color: '#6B7280',
+  },
+  promoContainer: {
+    width: '100%',
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  promoLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  promoInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  promoInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  promoInputValid: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+  promoInputInvalid: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  promoApplyButton: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  promoApplyText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  promoSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  promoSuccessText: {
+    fontSize: 13,
+    color: '#10B981',
+    fontWeight: '500',
+  },
+  promoError: {
+    fontSize: 13,
+    color: '#EF4444',
+    marginTop: 8,
   },
 });

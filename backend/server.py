@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, status, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -23,9 +23,75 @@ load_dotenv(ROOT_DIR / '.env')
 EXCHANGE_RATE_API_KEY = os.environ.get('EXCHANGE_RATE_API_KEY', 'free')  # Uses free tier if not set
 EXCHANGE_RATE_BASE_URL = "https://api.exchangerate-api.com/v4/latest/"
 
-# Stripe Configuration
+# Stripe Configuration - credentials fetched from Replit connection API
+stripe_credentials_cache = {"secret": None, "publishable": None, "cached_at": None}
+
+async def get_stripe_credentials():
+    """Fetch Stripe credentials from Replit connection API"""
+    global stripe_credentials_cache
+    
+    # Cache for 5 minutes
+    if stripe_credentials_cache["cached_at"] and \
+       (datetime.utcnow() - stripe_credentials_cache["cached_at"]).seconds < 300:
+        return stripe_credentials_cache
+    
+    hostname = os.environ.get('REPLIT_CONNECTORS_HOSTNAME')
+    repl_identity = os.environ.get('REPL_IDENTITY')
+    web_repl_renewal = os.environ.get('WEB_REPL_RENEWAL')
+    
+    if not hostname:
+        # Fall back to environment variables if not in Replit
+        return {
+            "secret": os.environ.get('STRIPE_SECRET_KEY'),
+            "publishable": os.environ.get('STRIPE_PUBLISHABLE_KEY')
+        }
+    
+    x_replit_token = f"repl {repl_identity}" if repl_identity else \
+                     f"depl {web_repl_renewal}" if web_repl_renewal else None
+    
+    if not x_replit_token:
+        return {"secret": None, "publishable": None}
+    
+    is_production = os.environ.get('REPLIT_DEPLOYMENT') == '1'
+    target_env = 'production' if is_production else 'development'
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"https://{hostname}/api/v2/connection"
+            params = {
+                "include_secrets": "true",
+                "connector_names": "stripe",
+                "environment": target_env
+            }
+            headers = {"Accept": "application/json", "X_REPLIT_TOKEN": x_replit_token}
+            
+            async with session.get(url, params=params, headers=headers) as resp:
+                data = await resp.json()
+                connection = data.get("items", [{}])[0]
+                
+                # Try secrets first (Replit connection format), then settings (fallback)
+                secrets = connection.get("secrets", {})
+                settings = connection.get("settings", {})
+                
+                secret_key = secrets.get("secret") or settings.get("secret")
+                publishable_key = secrets.get("publishable") or settings.get("publishable")
+                
+                stripe_credentials_cache = {
+                    "secret": secret_key,
+                    "publishable": publishable_key,
+                    "cached_at": datetime.utcnow()
+                }
+                
+                if stripe_credentials_cache["secret"]:
+                    stripe.api_key = stripe_credentials_cache["secret"]
+                
+                return stripe_credentials_cache
+    except Exception as e:
+        logger.error(f"Failed to fetch Stripe credentials: {e}")
+        return {"secret": None, "publishable": None}
+
+# Initialize Stripe from env vars (will be updated dynamically)
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
-STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY')
 
 # OpenAI Configuration
 openai_api_key = os.environ.get('OPENAI_API_KEY')
@@ -468,9 +534,41 @@ async def delete_transaction(transaction_id: str, current_user: dict = Depends(g
 
 # ============ CATEGORY ROUTES ============
 
+# Default income categories to create for new users
+DEFAULT_INCOME_CATEGORIES = [
+    {"name": "Salary", "icon": "💼", "color": "#10B981", "type": "income"},
+    {"name": "Freelance", "icon": "💻", "color": "#3B82F6", "type": "income"},
+    {"name": "Investments", "icon": "📈", "color": "#8B5CF6", "type": "income"},
+    {"name": "Business", "icon": "🏢", "color": "#F59E0B", "type": "income"},
+    {"name": "Rental", "icon": "🏠", "color": "#EC4899", "type": "income"},
+    {"name": "Other Income", "icon": "💰", "color": "#6B7280", "type": "income"},
+]
+
 @api_router.get("/categories", response_model=List[Category])
 async def get_categories(current_user: dict = Depends(get_current_user)):
     categories = await db.categories.find({"user_id": current_user["id"]}).to_list(1000)
+    
+    # Check if user has any income categories
+    has_income_categories = any(c.get("type") == "income" for c in categories)
+    
+    # Auto-create default income categories if none exist
+    if not has_income_categories:
+        for default_cat in DEFAULT_INCOME_CATEGORIES:
+            existing = await db.categories.find_one({
+                "user_id": current_user["id"],
+                "name": default_cat["name"]
+            })
+            if not existing:
+                cat_doc = {
+                    **default_cat,
+                    "user_id": current_user["id"],
+                    "created_at": datetime.utcnow()
+                }
+                await db.categories.insert_one(cat_doc)
+        
+        # Re-fetch categories after creating defaults
+        categories = await db.categories.find({"user_id": current_user["id"]}).to_list(1000)
+    
     result = []
     for c in categories:
         doc = serialize_mongo_doc(c)
@@ -1255,17 +1353,28 @@ async def create_subscription(
 @api_router.get("/subscription/config")
 async def get_stripe_config():
     """Get Stripe publishable key for frontend"""
-    return {"publishable_key": STRIPE_PUBLISHABLE_KEY}
+    credentials = await get_stripe_credentials()
+    return {"publishable_key": credentials.get("publishable")}
+
+class CheckoutSessionRequest(BaseModel):
+    plan_type: str
+    success_url: str
+    cancel_url: str
+    promo_code: Optional[str] = None
 
 @api_router.post("/subscription/create-checkout-session")
 async def create_checkout_session(
-    plan_type: str,
-    success_url: str,
-    cancel_url: str,
+    request: CheckoutSessionRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a Stripe Checkout session for web payments"""
     try:
+        # Ensure Stripe credentials are loaded
+        credentials = await get_stripe_credentials()
+        if not credentials.get("secret"):
+            raise HTTPException(status_code=503, detail="Payment system not configured")
+        
+        plan_type = request.plan_type
         if plan_type not in ["starter", "pro"]:
             raise HTTPException(status_code=400, detail="Invalid plan type")
         
@@ -1289,11 +1398,11 @@ async def create_checkout_session(
         prices = {"starter": 300, "pro": 900}  # in cents
         price_amount = prices[plan_type]
         
-        # Create Checkout Session
-        checkout_session = stripe.checkout.Session.create(
-            customer=stripe_customer_id,
-            payment_method_types=['card'],
-            line_items=[{
+        # Build checkout session params
+        checkout_params = {
+            "customer": stripe_customer_id,
+            "payment_method_types": ['card'],
+            "line_items": [{
                 'price_data': {
                     'currency': 'usd',
                     'product_data': {
@@ -1307,17 +1416,32 @@ async def create_checkout_session(
                 },
                 'quantity': 1,
             }],
-            mode='subscription',
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={
+            "mode": 'subscription',
+            "success_url": request.success_url,
+            "cancel_url": request.cancel_url,
+            "allow_promotion_codes": True,
+            "metadata": {
                 'user_id': current_user["id"],
                 'plan_type': plan_type,
             }
-        )
+        }
+        
+        # Apply promo code if provided
+        if request.promo_code:
+            try:
+                promo_codes = stripe.PromotionCode.list(code=request.promo_code, active=True, limit=1)
+                if promo_codes.data:
+                    checkout_params["discounts"] = [{"promotion_code": promo_codes.data[0].id}]
+                    del checkout_params["allow_promotion_codes"]
+            except Exception as e:
+                logger.warning(f"Failed to apply promo code: {e}")
+        
+        checkout_session = stripe.checkout.Session.create(**checkout_params)
         
         return {"checkout_url": checkout_session.url, "session_id": checkout_session.id}
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Checkout session creation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create checkout session: {str(e)}")
@@ -1350,6 +1474,134 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
     )
     
     return {"message": "Subscription cancelled successfully"}
+
+# ============ PROMO CODE ROUTES ============
+
+class PromoCodeCreate(BaseModel):
+    code: str
+    percent_off: Optional[int] = None
+    amount_off: Optional[int] = None  # in cents
+    duration: str = "once"  # once, forever, repeating
+    duration_in_months: Optional[int] = None
+    max_redemptions: Optional[int] = None
+
+@api_router.post("/promo-codes/validate")
+async def validate_promo_code(code: str = Query(...)):
+    """Validate a promo code"""
+    try:
+        credentials = await get_stripe_credentials()
+        if not credentials.get("secret"):
+            raise HTTPException(status_code=503, detail="Payment system not configured")
+        
+        promo_codes = stripe.PromotionCode.list(code=code, active=True, limit=1)
+        
+        if not promo_codes.data:
+            return {"valid": False, "message": "Invalid or expired promo code"}
+        
+        promo = promo_codes.data[0]
+        coupon = promo.coupon
+        
+        discount_text = ""
+        if coupon.percent_off:
+            discount_text = f"{coupon.percent_off}% off"
+        elif coupon.amount_off:
+            discount_text = f"${coupon.amount_off / 100:.2f} off"
+        
+        return {
+            "valid": True,
+            "code": code,
+            "discount": discount_text,
+            "percent_off": coupon.percent_off,
+            "amount_off": coupon.amount_off,
+            "duration": coupon.duration
+        }
+    except Exception as e:
+        logger.error(f"Promo code validation error: {e}")
+        return {"valid": False, "message": "Failed to validate promo code"}
+
+@api_router.post("/promo-codes/create")
+async def create_promo_code(request: PromoCodeCreate):
+    """Create a new promo code (admin only - for testers)"""
+    try:
+        credentials = await get_stripe_credentials()
+        if not credentials.get("secret"):
+            raise HTTPException(status_code=503, detail="Payment system not configured")
+        
+        # Create coupon first
+        coupon_params = {
+            "duration": request.duration,
+            "name": f"Promo: {request.code}"
+        }
+        
+        if request.percent_off:
+            coupon_params["percent_off"] = request.percent_off
+        elif request.amount_off:
+            coupon_params["amount_off"] = request.amount_off
+            coupon_params["currency"] = "usd"
+        else:
+            raise HTTPException(status_code=400, detail="Must specify percent_off or amount_off")
+        
+        if request.duration == "repeating" and request.duration_in_months:
+            coupon_params["duration_in_months"] = request.duration_in_months
+        
+        coupon = stripe.Coupon.create(**coupon_params)
+        
+        # Create promotion code with the custom code
+        promo_params = {
+            "coupon": coupon.id,
+            "code": request.code,
+        }
+        
+        if request.max_redemptions:
+            promo_params["max_redemptions"] = request.max_redemptions
+        
+        promo_code = stripe.PromotionCode.create(**promo_params)
+        
+        return {
+            "success": True,
+            "code": request.code,
+            "promo_code_id": promo_code.id,
+            "coupon_id": coupon.id
+        }
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating promo code: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating promo code: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create promo code: {str(e)}")
+
+@api_router.get("/promo-codes/list")
+async def list_promo_codes():
+    """List all active promo codes (admin only)"""
+    try:
+        credentials = await get_stripe_credentials()
+        if not credentials.get("secret"):
+            raise HTTPException(status_code=503, detail="Payment system not configured")
+        
+        promo_codes = stripe.PromotionCode.list(active=True, limit=100)
+        
+        result = []
+        for promo in promo_codes.data:
+            coupon = promo.coupon
+            discount_text = ""
+            if coupon.percent_off:
+                discount_text = f"{coupon.percent_off}% off"
+            elif coupon.amount_off:
+                discount_text = f"${coupon.amount_off / 100:.2f} off"
+            
+            result.append({
+                "id": promo.id,
+                "code": promo.code,
+                "discount": discount_text,
+                "times_redeemed": promo.times_redeemed,
+                "max_redemptions": promo.max_redemptions,
+                "active": promo.active
+            })
+        
+        return {"promo_codes": result}
+    except Exception as e:
+        logger.error(f"Error listing promo codes: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list promo codes")
 
 @api_router.get("/subscription/usage")
 async def get_subscription_usage(current_user: dict = Depends(get_current_user)):

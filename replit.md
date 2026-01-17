@@ -71,12 +71,17 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Configured mobile API URL to use public Replit domain for Expo Go compatibility
 - Removed incorrect EXPO_PUBLIC_BACKEND_URL env variable that was pointing to localhost:8000
 - Fixed API configuration to use proxy path (/api) for web and public domain for mobile
-- Added number formatting utility (formatNumber) for comma separators with 2 decimal places
+- Updated number formatting to show commas without .00 for whole numbers (1,500 not 1,500.00)
 - Added income/expense category types with tabbed UI in categories management screen
+- Backend auto-creates default income categories (Salary, Freelance, Investments, etc.) for new users
 - Backend defaults legacy categories without type field to 'expense' for backward compatibility
 - Frontend filters categories by type in add-transaction, with fallback for legacy categories
 - Fixed AI chat to only show action success message when transaction succeeds but OpenAI fails
 - Fixed logout functionality for web using Platform.OS check with window.confirm()
+- Integrated Stripe payments via Replit connection API (dynamic credential fetching)
+- Added promo code support to checkout with validation and application
+- Added promo code management endpoints (create, validate, list)
+- Upgrade screen now includes promo code input field with validation
 
 ## User Preferences
 - Mobile-first development approach
