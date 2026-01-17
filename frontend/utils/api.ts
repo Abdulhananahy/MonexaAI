@@ -3,12 +3,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const getApiUrl = () => {
-  if (Platform.OS === 'web') {
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || '';
-    return backendUrl ? `${backendUrl}/api` : '/api';
+  const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+  if (backendUrl) {
+    return `${backendUrl}/api`;
   }
-  const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-  return `${backendUrl}/api`;
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const host = window.location.hostname;
+    return `${protocol}//${host}:8000/api`;
+  }
+  return 'http://localhost:8000/api';
 };
 
 const api = axios.create({

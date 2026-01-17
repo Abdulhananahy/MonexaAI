@@ -28,10 +28,13 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY')
 
 # OpenAI Configuration
-openai_client = AsyncOpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+openai_api_key = os.environ.get('OPENAI_API_KEY')
+openai_client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else None
 
 async def send_openai_message(system_message: str, user_message: str) -> str:
     """Send a message to OpenAI and get a response"""
+    if not openai_client:
+        return "AI features are not available. Please configure the OpenAI API key."
     try:
         response = await openai_client.chat.completions.create(
             model="gpt-4o",
