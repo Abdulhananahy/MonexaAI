@@ -38,6 +38,14 @@ type ChartType = 'bar' | 'pie' | 'line';
 type TimePeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all' | 'custom';
 type ViewMode = 'categories' | 'income-expense';
 
+interface SubscriptionUsage {
+  plan_type: string;
+  charts_enabled: boolean;
+  export_enabled: boolean;
+  ai_messages_limit: number;
+  ai_messages_remaining: number;
+}
+
 export default function InsightsScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -46,6 +54,7 @@ export default function InsightsScreen() {
   const [insights, setInsights] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [subscriptionUsage, setSubscriptionUsage] = useState<SubscriptionUsage | null>(null);
   
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
@@ -63,14 +72,16 @@ export default function InsightsScreen() {
 
   const loadData = async () => {
     try {
-      const [analyticsRes, insightsRes, transactionsRes] = await Promise.all([
+      const [analyticsRes, insightsRes, transactionsRes, usageRes] = await Promise.all([
         api.get('/analytics/summary'),
         api.get('/analytics/insights'),
         api.get('/transactions'),
+        api.get('/subscription/usage'),
       ]);
       setAnalytics(analyticsRes.data);
       setInsights(insightsRes.data.insights || []);
       setTransactions(transactionsRes.data);
+      setSubscriptionUsage(usageRes.data);
     } catch (error) {
       console.error('Failed to load insights:', error);
     } finally {
@@ -544,7 +555,25 @@ export default function InsightsScreen() {
         </View>
 
         {/* Chart Display */}
-        <View style={styles.section}>{renderChart()}</View>
+        <View style={styles.section}>
+          {subscriptionUsage?.charts_enabled === true ? (
+            renderChart()
+          ) : (
+            <View style={styles.upgradePrompt}>
+              <Ionicons name="lock-closed" size={48} color="#D32F2F" />
+              <Text style={styles.upgradeTitle}>Charts are a Premium Feature</Text>
+              <Text style={styles.upgradeText}>
+                Upgrade to Starter or Pro to unlock beautiful charts and visualize your spending patterns.
+              </Text>
+              <TouchableOpacity
+                style={styles.upgradeButton}
+                onPress={() => router.push('/upgrade')}
+              >
+                <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
         {/* Financial Overview */}
         {analytics && (
@@ -897,6 +926,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   applyDateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  upgradePrompt: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  upgradeTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  upgradeText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  upgradeButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#D32F2F',
+    borderRadius: 8,
+  },
+  upgradeButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
