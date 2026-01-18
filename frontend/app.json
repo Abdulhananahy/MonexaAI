@@ -25,7 +25,7 @@
         "backgroundColor": "#D32F2F"
       },
       "permissions": ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": false
     },
     "web": {
       "bundler": "metro",

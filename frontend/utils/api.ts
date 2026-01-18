@@ -21,11 +21,25 @@ const api = axios.create({
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+    
+    if (error.response?.status === 503 && !config._retry) {
+      config._retry = true;
+      config._retryCount = (config._retryCount || 0) + 1;
+      
+      if (config._retryCount <= 3) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * config._retryCount));
+        return api(config);
+      }
+    }
+    
     if (error.code === 'ECONNABORTED') {
       error.message = 'Request timed out. Please check your internet connection.';
     } else if (!error.response) {
       error.message = `Network error: ${error.message}. Server may be unreachable.`;
+    } else if (error.response?.status === 503) {
+      error.message = 'Server is waking up. Please try again in a moment.';
     }
     return Promise.reject(error);
   }
