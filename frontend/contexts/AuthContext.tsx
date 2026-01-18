@@ -67,6 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (full_name: string, email: string, password: string) => {
     try {
+      console.log('Attempting signup to:', api.defaults.baseURL);
       const response = await api.post('/auth/signup', {
         full_name,
         email,
@@ -81,7 +82,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(access_token);
       setUser(userData);
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Signup failed');
+      console.error('Signup error details:', JSON.stringify(error, null, 2));
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      const errorMessage = error.response?.data?.detail || error.message || 'Signup failed';
+      throw new Error(errorMessage);
     }
   };
 
