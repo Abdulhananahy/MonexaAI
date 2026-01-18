@@ -693,15 +693,26 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
                 action_performed = True
                 action_response = f"✅ Added ${amount} expense for {category}."
         
-        # ADD INCOME
-        elif any(word in message_lower for word in ['earned', 'received', 'got paid', 'income']) and not 'expense' in message_lower:
+        # ADD INCOME - detect income keywords OR income categories like salary, freelance, etc.
+        elif any(word in message_lower for word in ['earned', 'received', 'got paid', 'income', 'salary', 'freelance', 'bonus', 'investment', 'dividend', 'refund', 'gift']) and 'expense' not in message_lower:
             import re
             amount_match = re.search(r'\$?(\d+(?:\.\d{2})?)', request.message)
-            source_match = re.search(r'from\s+(\w+)', request.message, re.IGNORECASE)
+            # Try to find source from "from X" or "in X" or "as X"
+            source_match = re.search(r'(?:from|in|as)\s+(\w+)', request.message, re.IGNORECASE)
             
             if amount_match:
                 amount = float(amount_match.group(1))
-                source = source_match.group(1).capitalize() if source_match else "Other"
+                # Determine source from match or from keywords in message
+                if source_match:
+                    source = source_match.group(1).capitalize()
+                else:
+                    # Check which income keyword was used
+                    for keyword in ['salary', 'freelance', 'bonus', 'investment', 'dividend', 'refund', 'gift']:
+                        if keyword in message_lower:
+                            source = keyword.capitalize()
+                            break
+                    else:
+                        source = "Other"
                 
                 # Create transaction
                 transaction = {
