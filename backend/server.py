@@ -670,15 +670,40 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         action_performed = False
         action_response = ""
         
-        # ADD EXPENSE
-        if any(word in message_lower for word in ['add', 'spent', 'bought', 'paid']) and 'expense' in message_lower:
+        # ADD EXPENSE - detect expense keywords and common expense categories
+        expense_categories = ['food', 'groceries', 'transport', 'transportation', 'uber', 'taxi', 'gas', 'fuel', 
+                              'rent', 'bills', 'utilities', 'electricity', 'water', 'internet', 'phone',
+                              'shopping', 'clothes', 'entertainment', 'movies', 'dining', 'restaurant',
+                              'health', 'medical', 'gym', 'fitness', 'education', 'books', 'subscriptions',
+                              'travel', 'hotel', 'flight', 'coffee', 'snacks', 'drinks']
+        
+        is_expense = ('expense' in message_lower or 
+                      any(word in message_lower for word in ['spent', 'bought', 'paid for']))
+        has_expense_category = any(cat in message_lower for cat in expense_categories) and 'expense' not in message_lower
+        
+        if any(word in message_lower for word in ['add', 'spent', 'bought', 'paid']) and (is_expense or has_expense_category):
             import re
             amount_match = re.search(r'\$?(\d+(?:\.\d{2})?)', request.message)
-            category_match = re.search(r'for\s+(\w+)', request.message, re.IGNORECASE)
+            # Try multiple patterns: "for food", "in food", "on food", or just the category word
+            category_match = re.search(r'(?:for|in|on)\s+(\w+)', request.message, re.IGNORECASE)
             
-            if amount_match and category_match:
+            # Determine category
+            category = None
+            if category_match:
+                potential_cat = category_match.group(1).lower()
+                # Skip if matched word is "expense" or a number
+                if potential_cat != 'expense' and not potential_cat.isdigit():
+                    category = potential_cat.capitalize()
+            
+            # If no category found from pattern, try to find expense category keyword
+            if not category:
+                for cat in expense_categories:
+                    if cat in message_lower:
+                        category = cat.capitalize()
+                        break
+            
+            if amount_match and category:
                 amount = float(amount_match.group(1))
-                category = category_match.group(1).capitalize()
                 
                 # Create transaction
                 transaction = {
@@ -909,7 +934,7 @@ What would you like to explore first?"""
             return {"message": intro_response}
         
         # Build context based on tone
-        context = f"""You are Monexa, an AI financial buddy with {current_tone['personality']}
+        context = f"""You are Monexa, an AI financial buddy and virtual assistant with {current_tone['personality']}
 
 TONE: {tone.upper()}
 {current_tone['style']}
@@ -927,11 +952,24 @@ RECENT ACTIVITY:
 TOP SPENDING:
 {top_spending_text}
 
+YOUR CAPABILITIES:
+1. Track transactions: Help add income/expenses when asked
+2. Financial advice: Give personalized tips based on their spending
+3. Budget guidance: Help with budgeting and saving strategies
+4. General assistant: Answer questions about spending, restaurants, deals, where to shop, travel tips, etc.
+5. Smart recommendations: If someone asks "find restaurants under $20" or "where to eat cheap", give helpful suggestions
+
+TRANSACTION HANDLING:
+- If user mentions adding money but type is unclear, ask: "Is this income or an expense?"
+- Common expense categories: food, groceries, transport, rent, bills, shopping, entertainment, health, education
+- Common income sources: salary, freelance, bonus, investment, gift, refund
+
 RESPONSE FORMAT:
-- Keep under 3 sentences
+- Keep responses concise (2-4 sentences)
 - Use {current_tone['style']}
-- Don't ask for data you already have
-- Provide insights from their actual spending
+- Be helpful and proactive
+- If asked about restaurants/shops/deals, give real helpful suggestions
+- If unsure about transaction type, ask clarifying questions
 
 Now respond to their message with your {tone} tone!"""
 
