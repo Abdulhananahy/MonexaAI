@@ -24,7 +24,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#D32F2F"
       },
-      "permissions": [],
+      "permissions": ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"],
       "edgeToEdgeEnabled": true
     },
     "web": {
