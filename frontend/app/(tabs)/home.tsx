@@ -24,26 +24,40 @@ interface AnalyticsSummary {
   transaction_count: number;
 }
 
+interface Transaction {
+  id: string;
+  type: 'income' | 'expense';
+  amount: number;
+  category_name: string;
+  income_source?: string;
+  date: string;
+}
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Reload data when screen comes into focus (e.g., after currency change)
   useFocusEffect(
     useCallback(() => {
-      loadSummary();
+      loadData();
     }, [])
   );
 
-  const loadSummary = async () => {
+  const loadData = async () => {
     try {
-      const response = await api.get('/analytics/summary');
-      setSummary(response.data);
+      const [summaryRes, transactionsRes] = await Promise.all([
+        api.get('/analytics/summary'),
+        api.get('/transactions?limit=5')
+      ]);
+      setSummary(summaryRes.data);
+      setTransactions(transactionsRes.data || []);
     } catch (error) {
-      console.error('Failed to load summary:', error);
+      console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -52,7 +66,7 @@ export default function HomeScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadSummary();
+    loadData();
   };
 
   if (loading) {
@@ -143,6 +157,41 @@ export default function HomeScreen() {
             <Text style={styles.actionButtonText}>Set Budget</Text>
           </TouchableOpacity>
         </View>
+
+        {transactions.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recent Transactions</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/transactions')}>
+                <Text style={styles.seeAll}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.transactionsList}>
+              {transactions.slice(0, 5).map((tx, index) => (
+                <View key={tx.id || index} style={styles.transactionItem}>
+                  <View style={styles.transactionLeft}>
+                    <View style={[styles.transactionIcon, { backgroundColor: tx.type === 'income' ? '#D1FAE5' : '#FEE2E2' }]}>
+                      <Ionicons 
+                        name={tx.type === 'income' ? 'arrow-down' : 'arrow-up'} 
+                        size={16} 
+                        color={tx.type === 'income' ? '#10B981' : '#EF4444'} 
+                      />
+                    </View>
+                    <View>
+                      <Text style={styles.transactionTitle}>
+                        {tx.type === 'income' ? (tx.income_source || 'Income') : tx.category_name}
+                      </Text>
+                      <Text style={styles.transactionDate}>{tx.date}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.transactionAmount, { color: tx.type === 'income' ? '#10B981' : '#EF4444' }]}>
+                    {tx.type === 'income' ? '+' : '-'}{user?.currency || 'USD'} {formatNumber(tx.amount)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {summary && summary.top_spending_categories.length > 0 && (
           <View style={styles.section}>
@@ -294,6 +343,43 @@ const styles = StyleSheet.create({
   },
   categoriesList: {
     gap: 12,
+  },
+  transactionsList: {
+    gap: 12,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+  },
+  transactionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  transactionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  transactionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   categoryItem: {
     flexDirection: 'row',
