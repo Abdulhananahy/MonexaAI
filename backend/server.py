@@ -12,7 +12,8 @@ from bson import ObjectId
 import os
 import logging
 from pathlib import Path
-from openai import AsyncOpenAI
+from google import genai
+from google.genai import types
 import aiohttp
 import stripe
 
@@ -93,27 +94,42 @@ async def get_stripe_credentials():
 # Initialize Stripe from env vars (will be updated dynamically)
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
-# OpenAI Configuration
-openai_api_key = os.environ.get('OPENAI_API_KEY')
-openai_client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else None
+# Gemini Configuration (using Replit AI Integrations - no API key needed)
+AI_INTEGRATIONS_GEMINI_API_KEY = os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY")
+AI_INTEGRATIONS_GEMINI_BASE_URL = os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL")
 
-async def send_openai_message(system_message: str, user_message: str) -> str:
-    """Send a message to OpenAI and get a response"""
-    if not openai_client:
-        return "AI features are not available. Please configure the OpenAI API key."
+gemini_client = None
+if AI_INTEGRATIONS_GEMINI_BASE_URL:
+    gemini_client = genai.Client(
+        api_key=AI_INTEGRATIONS_GEMINI_API_KEY,
+        http_options={
+            'api_version': '',
+            'base_url': AI_INTEGRATIONS_GEMINI_BASE_URL
+        }
+    )
+
+async def send_ai_message(system_message: str, user_message: str) -> str:
+    """Send a message to Gemini AI and get a response"""
+    if not gemini_client:
+        return "AI features are not available. Please configure the AI integration."
     try:
-        response = await openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_message}
-            ],
-            max_tokens=500,
-            temperature=0.7
+        import asyncio
+        combined_prompt = f"{system_message}\n\nUser: {user_message}"
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=combined_prompt,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=500,
+                    temperature=0.7
+                )
+            )
         )
-        return response.choices[0].message.content or ""
+        return response.text or ""
     except Exception as e:
-        logger.error(f"OpenAI error: {str(e)}")
+        logger.error(f"Gemini error: {str(e)}")
         return "I'm having trouble processing your request right now. Please try again."
 
 # MongoDB connection
@@ -750,7 +766,7 @@ Updated stats: Income ${total_income:.2f}, Expenses ${total_expense:.2f}
 
 Respond with ONE supportive sentence about this action."""
             
-            ai_response = await send_openai_message(simple_context, action_response)
+            ai_response = await send_ai_message(simple_context, action_response)
             
             # Only append AI response if it's not an error message
             if ai_response and "trouble processing" not in ai_response:
@@ -909,7 +925,7 @@ RESPONSE FORMAT:
 Now respond to their message with your {tone} tone!"""
 
         # Send message to OpenAI
-        ai_response = await send_openai_message(context, request.message)
+        ai_response = await send_ai_message(context, request.message)
         
         # Save AI response
         ai_message_doc = {
@@ -1081,7 +1097,7 @@ Number of Transactions: {len(transactions)}
 
 Format as a simple list, no numbering."""
 
-        insights_text = await send_openai_message(
+        insights_text = await send_ai_message(
             "You are a helpful financial assistant. Provide brief, supportive insights.",
             prompt
         )

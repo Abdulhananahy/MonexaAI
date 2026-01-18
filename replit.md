@@ -7,7 +7,7 @@ Monexa is a mobile-first personal finance application built with React Native (E
 - **Frontend**: React Native with Expo (TypeScript)
 - **Backend**: FastAPI (Python 3.11)
 - **Database**: MongoDB (external - requires MONGO_URL)
-- **AI**: OpenAI GPT for financial advice
+- **AI**: Google Gemini via Replit AI Integrations (no API key needed)
 - **Payments**: Stripe
 
 ## Project Structure
@@ -36,7 +36,7 @@ For full functionality, set these in the Secrets tab:
 |----------|----------|-------------|
 | MONGO_URL | Yes | MongoDB Atlas connection string |
 | DB_NAME | No | Database name (default: "monexa") |
-| OPENAI_API_KEY | No | OpenAI API key for AI advisor |
+| AI_INTEGRATIONS_GEMINI_* | Auto | Set automatically by Replit AI Integrations |
 | STRIPE_SECRET_KEY | No | Stripe secret key for payments |
 | JWT_SECRET_KEY | No | JWT signing key (auto-generated if not set) |
 
@@ -85,6 +85,7 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Charts are now gated behind subscription (free users see upgrade prompt, Starter/Pro see charts)
 - Fixed Stripe credential fetching to read from both 'secrets' and 'settings' keys
 - Fixed promo code validation to accept Query parameters matching frontend usage
+- Switched AI from OpenAI to Google Gemini using Replit AI Integrations (no external API key required, billed to Replit credits)
 
 ## Subscription Tiers
 - **Free**: 10 AI messages/day, no charts, no export
