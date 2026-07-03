@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "2t6lqKhhJuvSSXQSJgkAh"
+uri = "file://MONEXA_BUILD_SPEC.md"
+type = "text"
+title = "Monexa Build Specification"
