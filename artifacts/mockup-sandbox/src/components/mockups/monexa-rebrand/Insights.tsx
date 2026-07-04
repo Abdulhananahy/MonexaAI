@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ChevronLeft, MoreHorizontal, TrendingUp, TrendingDown, Calendar } from "lucide-react";
 import "./_shared/tokens.css";
 import { Mascot } from "./_shared/Mascot";
+import { BottomNav } from "./_shared/BottomNav";
 
 export function Insights() {
   const [timeRange, setTimeRange] = useState("This Month");
@@ -39,7 +40,7 @@ export function Insights() {
   }).join(", ");
 
   return (
-    <div className="monexa-rebrand mx-phone pb-24 bg-[var(--mx-bg)] font-sans">
+    <div className="monexa-rebrand mx-phone pb-28 bg-[var(--mx-bg)] font-sans">
       {/* Header */}
       <header className="px-6 pt-12 pb-6 flex items-center justify-between sticky top-0 bg-[var(--mx-bg)]/90 backdrop-blur-md z-10">
         <button className="w-10 h-10 rounded-full bg-[var(--mx-bg-elevated)] shadow-[var(--mx-shadow-soft)] flex items-center justify-center text-[var(--mx-ink)] active:scale-95 transition-transform">
@@ -93,9 +94,9 @@ export function Insights() {
         >
           <h3 className="mx-display text-xl font-bold text-[var(--mx-ink)] mb-6">Spending Breakdown</h3>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-start gap-4">
             {/* Donut Chart */}
-            <div className="relative w-32 h-32 flex-shrink-0">
+            <div className="relative w-24 h-24 flex-shrink-0 mt-1">
               <div 
                 className="w-full h-full rounded-full mx-anim-bounce-in"
                 style={{
@@ -105,21 +106,21 @@ export function Insights() {
               />
               {/* Inner circle for donut hole */}
               <div className="absolute inset-[20%] bg-[var(--mx-bg-elevated)] rounded-full flex items-center justify-center shadow-inner">
-                <span className="mx-display font-bold text-lg text-[var(--mx-ink)]">
+                <span className="mx-display font-bold text-base text-[var(--mx-ink)]">
                   {categories[0].percentage}%
                 </span>
               </div>
             </div>
 
             {/* Legend */}
-            <div className="flex flex-col gap-3 flex-1">
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
               {categories.slice(0, 4).map((cat, i) => (
-                <div key={cat.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }}></div>
-                    <span className="text-[var(--mx-ink)] font-medium truncate max-w-[80px]">{cat.name}</span>
+                <div key={cat.name} className="flex items-center justify-between gap-3 text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }}></div>
+                    <span className="text-[var(--mx-ink)] font-medium leading-snug">{cat.name}</span>
                   </div>
-                  <span className="text-[var(--mx-ink-soft)] font-semibold">{cat.percentage}%</span>
+                  <span className="text-[var(--mx-ink-soft)] font-semibold shrink-0">{cat.percentage}%</span>
                 </div>
               ))}
             </div>
@@ -220,6 +221,8 @@ export function Insights() {
         </div>
 
       </main>
+
+      <BottomNav active="insights" />
     </div>
   );
 }

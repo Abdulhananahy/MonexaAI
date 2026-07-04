@@ -117,7 +117,33 @@ export function Signup() {
             <span className="px-4 text-sm font-bold opacity-40" style={{ color: 'var(--mx-ink)' }}>OR</span>
             <div className="h-[2px] flex-1 opacity-10" style={{ background: 'var(--mx-ink)' }}></div>
           </div>
-          
+
+          <div className="flex flex-col gap-3 w-full">
+            <button
+              type="button"
+              className="w-full py-3.5 px-4 flex items-center justify-center gap-3 rounded-[var(--mx-card-radius)] font-bold text-base transition-transform hover:scale-[1.02] active:scale-[0.98] bg-[var(--mx-bg-elevated)]"
+              style={{ color: 'var(--mx-ink)', boxShadow: 'var(--mx-shadow-soft)' }}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" />
+                <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29A11.95 11.95 0 0 0 0 12c0 1.93.46 3.76 1.29 5.38l3.98-3.09z" />
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.94 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
+              </svg>
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              className="w-full py-3.5 px-4 flex items-center justify-center gap-3 rounded-[var(--mx-card-radius)] font-bold text-base text-white transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              style={{ background: 'var(--mx-ink)' }}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8.87-.17 1.7-.85 3.08-.79 1.71.09 3 .87 3.85 2.15-3.44 2.06-2.87 6.28.44 7.9-.5 1.24-1.13 2.44-2.45 3.91zM12.03 7.25c-.14-2.11 1.7-3.85 3.66-4.02.28 2.16-1.94 3.87-3.66 4.02z" />
+              </svg>
+              Continue with Apple
+            </button>
+          </div>
+
           <div className="flex justify-center w-full">
             <button 
               className="text-base font-medium px-4 py-2" 

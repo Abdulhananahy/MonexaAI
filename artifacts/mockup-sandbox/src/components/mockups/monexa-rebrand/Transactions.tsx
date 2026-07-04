@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronLeft, Filter, Search, ChevronRight } from 'lucide-react';
 import "./_shared/tokens.css";
 import { Mascot } from "./_shared/Mascot";
+import { BottomNav } from "./_shared/BottomNav";
 
 const TRANSACTIONS_DATA = [
   {
@@ -90,7 +91,7 @@ export function Transactions() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-6 pb-12 flex flex-col gap-6">
+      <main className="flex-1 overflow-y-auto px-6 pb-28 flex flex-col gap-6">
         {filteredData.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 mt-12 opacity-80">
             <Mascot mood="thinking" size={120} />
@@ -156,6 +157,8 @@ export function Transactions() {
           ))
         )}
       </main>
+
+      <BottomNav active="transactions" />
     </div>
   );
 }

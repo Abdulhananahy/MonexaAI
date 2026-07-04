@@ -14,7 +14,7 @@ export function Preferences() {
   });
 
   return (
-    <div className="monexa-rebrand mx-phone relative flex flex-col h-full bg-[#FFFDF9] overflow-hidden text-[#2D3436]">
+    <div className="monexa-rebrand mx-phone relative flex flex-col h-full bg-[var(--mx-bg)] overflow-hidden text-[var(--mx-ink)]">
       <style>{`
         .mx-glass-card {
           background: rgba(255, 255, 255, 0.7);
@@ -32,20 +32,20 @@ export function Preferences() {
       `}</style>
 
       {/* Header */}
-      <div className="flex items-center px-6 pt-12 pb-4 z-10 bg-[#FFFDF9]/90 backdrop-blur-md sticky top-0">
-        <button className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm text-[#2D3436] hover:bg-gray-50 transition-colors">
+      <div className="flex items-center px-6 pt-12 pb-4 z-10 bg-[var(--mx-bg)]/90 backdrop-blur-md sticky top-0">
+        <button className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm text-[var(--mx-ink)] hover:bg-gray-50 transition-colors">
           <ChevronLeft size={20} />
         </button>
-        <h1 className="font-['Baloo_2'] text-2xl font-bold text-[#2D3436] ml-4">Preferences</h1>
+        <h1 className="font-['Baloo_2'] text-2xl font-bold text-[var(--mx-ink)] ml-4">Preferences</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pb-24 space-y-8 scrollbar-hide relative z-0">
         
         {/* Playful top section */}
-        <div className="flex items-center justify-between mx-glass-card rounded-[28px] p-5 relative overflow-hidden bg-gradient-to-br from-[#6C5CE7]/10 to-[#FFC94D]/10">
+        <div className="flex items-center justify-between mx-glass-card rounded-[28px] p-5 relative overflow-hidden bg-gradient-to-br from-[var(--mx-primary)]/10 to-[var(--mx-gold)]/10">
           <div>
-            <h2 className="font-['Baloo_2'] text-xl font-bold text-[#2D3436] mb-1">Make it yours!</h2>
-            <p className="text-sm text-[#2D3436]/60 font-['Inter']">Customize your experience</p>
+            <h2 className="font-['Baloo_2'] text-xl font-bold text-[var(--mx-ink)] mb-1">Make it yours!</h2>
+            <p className="text-sm text-[var(--mx-ink)]/60 font-['Inter']">Customize your experience</p>
           </div>
           <div className="w-16 h-16 relative">
             <div className="absolute inset-0 transform scale-150 origin-bottom right-[-10px]">
@@ -56,7 +56,7 @@ export function Preferences() {
 
         {/* General Settings */}
         <section>
-          <h3 className="font-['Baloo_2'] text-lg font-bold text-[#2D3436] mb-3 px-2">General</h3>
+          <h3 className="font-['Baloo_2'] text-lg font-bold text-[var(--mx-ink)] mb-3 px-2">General</h3>
           <div className="bg-white rounded-[28px] p-2 shadow-sm border border-gray-100/50">
             {/* Currency Selector */}
             <div 
@@ -64,12 +64,12 @@ export function Preferences() {
               onClick={() => setCurrencyOpen(!currencyOpen)}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#6C5CE7]/10 flex items-center justify-center text-[#6C5CE7]">
+                <div className="w-10 h-10 rounded-full bg-[var(--mx-primary)]/10 flex items-center justify-center text-[var(--mx-primary)]">
                   <Globe size={20} />
                 </div>
                 <div>
-                  <p className="font-['Inter'] font-semibold text-[#2D3436]">Currency</p>
-                  <p className="font-['Inter'] text-xs text-[#2D3436]/50">USD - US Dollar</p>
+                  <p className="font-['Inter'] font-semibold text-[var(--mx-ink)]">Currency</p>
+                  <p className="font-['Inter'] text-xs text-[var(--mx-ink)]/50">USD - US Dollar</p>
                 </div>
               </div>
               <ChevronRight size={20} className={`text-gray-400 transition-transform ${currencyOpen ? 'rotate-90' : ''}`} />
@@ -77,14 +77,14 @@ export function Preferences() {
               {/* Fake Currency Dropdown Hint */}
               {currencyOpen && (
                 <div className="absolute top-[110%] right-0 w-48 bg-white rounded-2xl shadow-lg border border-gray-100 p-2 z-20 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#6C5CE7]/5 text-[#6C5CE7]">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--mx-primary)]/5 text-[var(--mx-primary)]">
                     <span className="font-['Inter'] font-semibold text-sm">USD</span>
                     <Check size={16} />
                   </div>
-                  <div className="flex items-center p-3 rounded-xl hover:bg-gray-50 text-[#2D3436]">
+                  <div className="flex items-center p-3 rounded-xl hover:bg-gray-50 text-[var(--mx-ink)]">
                     <span className="font-['Inter'] font-medium text-sm">EUR</span>
                   </div>
-                  <div className="flex items-center p-3 rounded-xl hover:bg-gray-50 text-[#2D3436]">
+                  <div className="flex items-center p-3 rounded-xl hover:bg-gray-50 text-[var(--mx-ink)]">
                     <span className="font-['Inter'] font-medium text-sm">GBP</span>
                   </div>
                 </div>
@@ -96,16 +96,16 @@ export function Preferences() {
             {/* Dark Mode */}
             <div className="flex items-center justify-between p-4 rounded-2xl">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#2D3436]/5 flex items-center justify-center text-[#2D3436]">
+                <div className="w-10 h-10 rounded-full bg-[var(--mx-ink)]/5 flex items-center justify-center text-[var(--mx-ink)]">
                   <Moon size={20} />
                 </div>
                 <div>
-                  <p className="font-['Inter'] font-semibold text-[#2D3436]">Dark Mode</p>
-                  <p className="font-['Inter'] text-xs text-[#2D3436]/50">Easier on the eyes</p>
+                  <p className="font-['Inter'] font-semibold text-[var(--mx-ink)]">Dark Mode</p>
+                  <p className="font-['Inter'] text-xs text-[var(--mx-ink)]/50">Easier on the eyes</p>
                 </div>
               </div>
               <button 
-                className={`w-12 h-6 rounded-full p-1 mx-switch-bg ${darkMode ? 'bg-[#6C5CE7]' : 'bg-gray-200'}`}
+                className={`w-12 h-6 rounded-full p-1 mx-switch-bg ${darkMode ? 'bg-[var(--mx-primary)]' : 'bg-gray-200'}`}
                 onClick={() => setDarkMode(!darkMode)}
               >
                 <div className={`w-4 h-4 rounded-full bg-white mx-switch-knob shadow-sm ${darkMode ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -116,27 +116,27 @@ export function Preferences() {
 
         {/* Budget Settings */}
         <section>
-          <h3 className="font-['Baloo_2'] text-lg font-bold text-[#2D3436] mb-3 px-2">Budgeting</h3>
+          <h3 className="font-['Baloo_2'] text-lg font-bold text-[var(--mx-ink)] mb-3 px-2">Budgeting</h3>
           <div className="bg-white rounded-[28px] p-4 shadow-sm border border-gray-100/50">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[#FFC94D]/20 flex items-center justify-center text-[#E5B545]">
+              <div className="w-10 h-10 rounded-full bg-[var(--mx-gold)]/20 flex items-center justify-center text-[var(--mx-gold)]">
                 <Wallet size={20} />
               </div>
               <div>
-                <p className="font-['Inter'] font-semibold text-[#2D3436]">Monthly Budget</p>
-                <p className="font-['Inter'] text-xs text-[#2D3436]/50">Quick-set your limit</p>
+                <p className="font-['Inter'] font-semibold text-[var(--mx-ink)]">Monthly Budget</p>
+                <p className="font-['Inter'] text-xs text-[var(--mx-ink)]/50">Quick-set your limit</p>
               </div>
             </div>
             
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-[#2D3436]">$</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-[var(--mx-ink)]">$</span>
               <input 
                 type="text" 
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
-                className="w-full bg-[#FFFDF9] border-2 border-[#6C5CE7]/10 rounded-2xl py-3 pl-8 pr-4 font-['Baloo_2'] text-2xl font-bold text-[#2D3436] focus:outline-none focus:border-[#6C5CE7] transition-colors"
+                className="w-full bg-[var(--mx-bg)] border-2 border-[var(--mx-primary)]/10 rounded-2xl py-3 pl-8 pr-4 font-['Baloo_2'] text-2xl font-bold text-[var(--mx-ink)] focus:outline-none focus:border-[var(--mx-primary)] transition-colors"
               />
-              <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#6C5CE7] text-white px-4 py-1.5 rounded-xl text-sm font-bold shadow-sm hover:bg-[#5A4AD1] transition-colors">
+              <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--mx-primary)] text-white px-4 py-1.5 rounded-xl text-sm font-bold shadow-sm hover:bg-[#5A4AD1] transition-colors">
                 Save
               </button>
             </div>
@@ -145,7 +145,7 @@ export function Preferences() {
 
         {/* Notifications */}
         <section>
-          <h3 className="font-['Baloo_2'] text-lg font-bold text-[#2D3436] mb-3 px-2">Notifications</h3>
+          <h3 className="font-['Baloo_2'] text-lg font-bold text-[var(--mx-ink)] mb-3 px-2">Notifications</h3>
           <div className="bg-white rounded-[28px] p-2 shadow-sm border border-gray-100/50">
             
             <div className="flex items-center justify-between p-4 rounded-2xl">
@@ -154,12 +154,12 @@ export function Preferences() {
                   <BellRing size={20} />
                 </div>
                 <div>
-                  <p className="font-['Inter'] font-semibold text-[#2D3436]">Budget Alerts</p>
-                  <p className="font-['Inter'] text-xs text-[#2D3436]/50">When near your limit</p>
+                  <p className="font-['Inter'] font-semibold text-[var(--mx-ink)]">Budget Alerts</p>
+                  <p className="font-['Inter'] text-xs text-[var(--mx-ink)]/50">When near your limit</p>
                 </div>
               </div>
               <button 
-                className={`w-12 h-6 rounded-full p-1 mx-switch-bg ${toggles.budgetAlerts ? 'bg-[#6C5CE7]' : 'bg-gray-200'}`}
+                className={`w-12 h-6 rounded-full p-1 mx-switch-bg ${toggles.budgetAlerts ? 'bg-[var(--mx-primary)]' : 'bg-gray-200'}`}
                 onClick={() => setToggles({...toggles, budgetAlerts: !toggles.budgetAlerts})}
               >
                 <div className={`w-4 h-4 rounded-full bg-white mx-switch-knob shadow-sm ${toggles.budgetAlerts ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -174,12 +174,12 @@ export function Preferences() {
                   <Mail size={20} />
                 </div>
                 <div>
-                  <p className="font-['Inter'] font-semibold text-[#2D3436]">Weekly Summary</p>
-                  <p className="font-['Inter'] text-xs text-[#2D3436]/50">Email report on Mondays</p>
+                  <p className="font-['Inter'] font-semibold text-[var(--mx-ink)]">Weekly Summary</p>
+                  <p className="font-['Inter'] text-xs text-[var(--mx-ink)]/50">Email report on Mondays</p>
                 </div>
               </div>
               <button 
-                className={`w-12 h-6 rounded-full p-1 mx-switch-bg ${toggles.weeklySummary ? 'bg-[#6C5CE7]' : 'bg-gray-200'}`}
+                className={`w-12 h-6 rounded-full p-1 mx-switch-bg ${toggles.weeklySummary ? 'bg-[var(--mx-primary)]' : 'bg-gray-200'}`}
                 onClick={() => setToggles({...toggles, weeklySummary: !toggles.weeklySummary})}
               >
                 <div className={`w-4 h-4 rounded-full bg-white mx-switch-knob shadow-sm ${toggles.weeklySummary ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -194,12 +194,12 @@ export function Preferences() {
                   <MessageSquare size={20} />
                 </div>
                 <div>
-                  <p className="font-['Inter'] font-semibold text-[#2D3436]">Transaction Reminders</p>
-                  <p className="font-['Inter'] text-xs text-[#2D3436]/50">Push notifications</p>
+                  <p className="font-['Inter'] font-semibold text-[var(--mx-ink)]">Transaction Reminders</p>
+                  <p className="font-['Inter'] text-xs text-[var(--mx-ink)]/50">Push notifications</p>
                 </div>
               </div>
               <button 
-                className={`w-12 h-6 rounded-full p-1 mx-switch-bg ${toggles.transactionReminders ? 'bg-[#6C5CE7]' : 'bg-gray-200'}`}
+                className={`w-12 h-6 rounded-full p-1 mx-switch-bg ${toggles.transactionReminders ? 'bg-[var(--mx-primary)]' : 'bg-gray-200'}`}
                 onClick={() => setToggles({...toggles, transactionReminders: !toggles.transactionReminders})}
               >
                 <div className={`w-4 h-4 rounded-full bg-white mx-switch-knob shadow-sm ${toggles.transactionReminders ? 'translate-x-6' : 'translate-x-0'}`} />

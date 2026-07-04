@@ -72,7 +72,7 @@ export function Onboarding() {
           </div>
           
           {/* Floating Icon */}
-          <div className="absolute -bottom-4 -right-4 bg-[var(--mx-bg-elevated)] p-4 rounded-2xl shadow-[var(--mx-shadow-soft)] rotate-12 mx-anim-wiggle" key={`icon-${currentSlide}`}>
+          <div className="absolute -bottom-2 -right-8 bg-[var(--mx-bg-elevated)] p-3.5 rounded-2xl shadow-[var(--mx-shadow-soft)] rotate-6 ring-4 ring-[var(--mx-bg)] mx-anim-wiggle" key={`icon-${currentSlide}`}>
             {slide.icon}
           </div>
         </div>

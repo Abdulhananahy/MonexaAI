@@ -14,7 +14,7 @@ export function Chat() {
   ];
 
   return (
-    <div className="monexa-rebrand mx-phone flex flex-col h-[100dvh] relative">
+    <div className="monexa-rebrand mx-phone flex flex-col h-[100dvh] relative w-full max-w-full overflow-x-hidden">
       {/* Header */}
       <header 
         className="flex items-center gap-4 px-6 py-4 sticky top-0 z-10"
@@ -43,14 +43,14 @@ export function Chat() {
       </header>
 
       {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-6 pb-32">
+      <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto px-5 py-6 flex flex-col gap-6 pb-32 w-full">
         {/* Date separator */}
         <div className="text-center text-[12px] font-semibold text-[var(--mx-ink-soft)] uppercase tracking-wider my-2">
           Today
         </div>
 
         {/* Assistant Message */}
-        <div className="flex gap-3 max-w-[85%] mx-anim-bounce-in" style={{ animationDelay: "0.1s" }}>
+        <div className="flex gap-3 max-w-[85%] min-w-0 mx-anim-bounce-in" style={{ animationDelay: "0.1s" }}>
           <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-[var(--mx-primary-soft)] shrink-0 mt-auto">
             <Mascot mood="waving" size={32} className="translate-y-0.5" />
           </div>
@@ -67,9 +67,9 @@ export function Chat() {
         </div>
 
         {/* User Message */}
-        <div className="flex justify-end mx-anim-bounce-in" style={{ animationDelay: "0.2s" }}>
+        <div className="flex justify-end w-full min-w-0 mx-anim-bounce-in" style={{ animationDelay: "0.2s" }}>
           <div 
-            className="px-5 py-3.5 text-[15px] leading-relaxed max-w-[85%] shadow-sm"
+            className="px-5 py-3.5 text-[15px] leading-relaxed max-w-[85%] min-w-0 break-words shadow-sm"
             style={{ 
               background: "var(--mx-ink)", 
               color: "#FFFFFF",
@@ -81,7 +81,7 @@ export function Chat() {
         </div>
 
         {/* Assistant Message */}
-        <div className="flex gap-3 max-w-[90%] mx-anim-bounce-in" style={{ animationDelay: "0.3s" }}>
+        <div className="flex gap-3 max-w-[90%] min-w-0 mx-anim-bounce-in" style={{ animationDelay: "0.3s" }}>
           <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-[var(--mx-primary-soft)] shrink-0 mt-auto">
             <Mascot mood="thinking" size={32} className="translate-y-0.5" />
           </div>
@@ -122,9 +122,9 @@ export function Chat() {
         </div>
 
         {/* User Message */}
-        <div className="flex justify-end mx-anim-bounce-in" style={{ animationDelay: "0.4s" }}>
+        <div className="flex justify-end w-full min-w-0 mx-anim-bounce-in" style={{ animationDelay: "0.4s" }}>
           <div 
-            className="px-5 py-3.5 text-[15px] leading-relaxed max-w-[85%] shadow-sm"
+            className="px-5 py-3.5 text-[15px] leading-relaxed max-w-[85%] min-w-0 break-words shadow-sm"
             style={{ 
               background: "var(--mx-ink)", 
               color: "#FFFFFF",
@@ -136,7 +136,7 @@ export function Chat() {
         </div>
 
         {/* Assistant Message (Typing Indicator) */}
-        <div className="flex gap-3 max-w-[85%] mx-anim-bounce-in" style={{ animationDelay: "0.5s" }}>
+        <div className="flex gap-3 max-w-[85%] min-w-0 mx-anim-bounce-in" style={{ animationDelay: "0.5s" }}>
           <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-[var(--mx-primary-soft)] shrink-0 mt-auto">
             <Mascot mood="happy" size={32} className="translate-y-0.5" />
           </div>

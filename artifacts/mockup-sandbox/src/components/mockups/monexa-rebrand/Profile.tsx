@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import "./_shared/tokens.css";
 import { Mascot } from "./_shared/Mascot";
+import { BottomNav } from "./_shared/BottomNav";
 
 export function Profile() {
   return (
@@ -38,7 +39,7 @@ export function Profile() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-6 pb-12 flex flex-col gap-6">
+      <main className="flex-1 overflow-y-auto px-6 pb-28 flex flex-col gap-6">
         
         {/* Stats Card */}
         <div 
@@ -100,6 +101,8 @@ export function Profile() {
           </button>
         </div>
       </main>
+
+      <BottomNav active="profile" />
     </div>
   );
 }

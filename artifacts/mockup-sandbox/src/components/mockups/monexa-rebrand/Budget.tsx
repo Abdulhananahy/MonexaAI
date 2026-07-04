@@ -18,7 +18,7 @@ export function Budget() {
   // Categories breakdown
   const categories = [
     { name: "Housing", icon: Home, amount: 450, total: 500, color: "var(--mx-primary)" },
-    { name: "Food", icon: Coffee, amount: 200, total: 300, color: "var(--mx-accent)" },
+    { name: "Food", icon: Coffee, amount: 200, total: 300, color: "var(--mx-gold)" },
     { name: "Shopping", icon: ShoppingBag, amount: 120, total: 150, color: "var(--mx-expense)" },
     { name: "Transport", icon: TrendingUp, amount: 50, total: 100, color: "var(--mx-income)" },
   ];
@@ -54,7 +54,7 @@ export function Budget() {
           color: white;
         }
         .period-tab:not(.active) {
-          color: var(--mx-text-muted);
+          color: var(--mx-ink-soft);
         }
         .progress-ring-circle {
           transition: stroke-dashoffset 0.5s ease-in-out;
@@ -68,9 +68,9 @@ export function Budget() {
           display: "flex", alignItems: "center", justifyContent: "center",
           background: "white", cursor: "pointer"
         }}>
-          <ChevronLeft size={20} color="var(--mx-text)" />
+          <ChevronLeft size={20} color="var(--mx-ink)" />
         </button>
-        <h1 className="mx-heading" style={{ margin: 0, fontSize: 20, color: "var(--mx-text)" }}>Budget</h1>
+        <h1 className="mx-heading" style={{ margin: 0, fontSize: 20, color: "var(--mx-ink)" }}>Budget</h1>
         <div style={{ width: 40 }} /> {/* Spacer */}
       </div>
 
@@ -119,7 +119,7 @@ export function Budget() {
               <circle 
                 className="progress-ring-circle"
                 cx="90" cy="90" r="75" fill="none" 
-                stroke={isOver ? "var(--mx-expense)" : isClose ? "var(--mx-accent)" : "var(--mx-primary)"} 
+                stroke={isOver ? "var(--mx-expense)" : isClose ? "var(--mx-gold)" : "var(--mx-primary)"} 
                 strokeWidth="16" 
                 strokeLinecap="round" 
                 strokeDasharray={2 * Math.PI * 75}
@@ -131,11 +131,11 @@ export function Budget() {
               position: "absolute", inset: 0, 
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" 
             }}>
-              <span style={{ fontSize: 14, color: "var(--mx-text-muted)", fontWeight: 500 }}>Spent</span>
-              <span className="mx-heading" style={{ fontSize: 32, color: "var(--mx-text)", lineHeight: 1.2 }}>
+              <span style={{ fontSize: 14, color: "var(--mx-ink-soft)", fontWeight: 500 }}>Spent</span>
+              <span className="mx-heading" style={{ fontSize: 32, color: "var(--mx-ink)", lineHeight: 1.2 }}>
                 ${spent}
               </span>
-              <span style={{ fontSize: 13, color: "var(--mx-text-muted)", marginTop: 4 }}>
+              <span style={{ fontSize: 13, color: "var(--mx-ink-soft)", marginTop: 4 }}>
                 of ${budgetLimit}
               </span>
             </div>
@@ -143,14 +143,14 @@ export function Budget() {
 
           <div style={{ width: "100%", marginTop: 24, padding: "16px", background: "#F9F8FD", borderRadius: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontSize: 14, color: "var(--mx-text-muted)" }}>Remaining</span>
-              <span style={{ fontSize: 14, color: "var(--mx-text-muted)" }}>Days Left</span>
+              <span style={{ fontSize: 14, color: "var(--mx-ink-soft)" }}>Remaining</span>
+              <span style={{ fontSize: 14, color: "var(--mx-ink-soft)" }}>Days Left</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="mx-heading" style={{ fontSize: 20, color: remaining < 0 ? "var(--mx-expense)" : "var(--mx-text)" }}>
+              <span className="mx-heading" style={{ fontSize: 20, color: remaining < 0 ? "var(--mx-expense)" : "var(--mx-ink)" }}>
                 ${Math.abs(remaining)}{remaining < 0 ? " over" : ""}
               </span>
-              <span className="mx-heading" style={{ fontSize: 20, color: "var(--mx-text)" }}>
+              <span className="mx-heading" style={{ fontSize: 20, color: "var(--mx-ink)" }}>
                 12 Days
               </span>
             </div>
@@ -160,20 +160,20 @@ export function Budget() {
 
         {/* Edit Budget Input */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h2 className="mx-heading" style={{ margin: 0, fontSize: 18, color: "var(--mx-text)" }}>Monthly Limit</h2>
+          <h2 className="mx-heading" style={{ margin: 0, fontSize: 18, color: "var(--mx-ink)" }}>Monthly Limit</h2>
           
           {isEditing ? (
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <button 
                 onClick={() => setBudgetLimit(prev => Math.max(0, prev - 100))}
-                style={{ width: 32, height: 32, borderRadius: 16, background: "#F4F3FB", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--mx-text)" }}
+                style={{ width: 32, height: 32, borderRadius: 16, background: "#F4F3FB", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--mx-ink)" }}
               >
                 <Minus size={16} />
               </button>
-              <span className="mx-heading" style={{ fontSize: 20, width: 60, textAlign: "center", color: "var(--mx-text)" }}>${budgetLimit}</span>
+              <span className="mx-heading" style={{ fontSize: 20, width: 60, textAlign: "center", color: "var(--mx-ink)" }}>${budgetLimit}</span>
               <button 
                 onClick={() => setBudgetLimit(prev => prev + 100)}
-                style={{ width: 32, height: 32, borderRadius: 16, background: "#F4F3FB", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--mx-text)" }}
+                style={{ width: 32, height: 32, borderRadius: 16, background: "#F4F3FB", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--mx-ink)" }}
               >
                 <Plus size={16} />
               </button>
@@ -182,7 +182,7 @@ export function Budget() {
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span className="mx-heading" style={{ fontSize: 20, color: "var(--mx-primary)" }}>${budgetLimit}</span>
-              <button onClick={() => setIsEditing(true)} style={{ background: "none", border: "none", color: "var(--mx-text-muted)", cursor: "pointer", display: "flex" }}>
+              <button onClick={() => setIsEditing(true)} style={{ background: "none", border: "none", color: "var(--mx-ink-soft)", cursor: "pointer", display: "flex" }}>
                 <Edit2 size={16} />
               </button>
             </div>
@@ -199,10 +199,10 @@ export function Budget() {
             <Mascot mood={isOver ? "thinking" : isClose ? "thinking" : "happy"} />
           </div>
           <div>
-            <div className="mx-heading" style={{ fontSize: 16, color: "var(--mx-text)", marginBottom: 2 }}>
+            <div className="mx-heading" style={{ fontSize: 16, color: "var(--mx-ink)", marginBottom: 2 }}>
               {isOver ? "Oops! Over limit." : isClose ? "Watch out!" : "Looking good!"}
             </div>
-            <div style={{ fontSize: 13, color: "var(--mx-text-muted)", lineHeight: 1.4 }}>
+            <div style={{ fontSize: 13, color: "var(--mx-ink-soft)", lineHeight: 1.4 }}>
               {isOver 
                 ? "You've exceeded your budget this period. Let's review expenses." 
                 : isClose 
@@ -214,7 +214,7 @@ export function Budget() {
 
         {/* Top Categories Breakdown */}
         <div>
-          <h2 className="mx-heading" style={{ margin: "0 0 16px", fontSize: 18, color: "var(--mx-text)" }}>Top Categories</h2>
+          <h2 className="mx-heading" style={{ margin: "0 0 16px", fontSize: 18, color: "var(--mx-ink)" }}>Top Categories</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {categories.map((cat, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -228,8 +228,8 @@ export function Budget() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 15, color: "var(--mx-text)" }}>{cat.name}</span>
-                    <span style={{ fontWeight: 600, fontSize: 15, color: "var(--mx-text)" }}>${cat.amount}</span>
+                    <span style={{ fontWeight: 600, fontSize: 15, color: "var(--mx-ink)" }}>{cat.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: 15, color: "var(--mx-ink)" }}>${cat.amount}</span>
                   </div>
                   <div style={{ width: "100%", height: 6, background: "#F4F3FB", borderRadius: 3, overflow: "hidden" }}>
                     <div style={{ 
@@ -239,7 +239,7 @@ export function Budget() {
                       borderRadius: 3
                     }} />
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--mx-text-muted)", marginTop: 6 }}>
+                  <div style={{ fontSize: 12, color: "var(--mx-ink-soft)", marginTop: 6 }}>
                     ${cat.total - cat.amount} left
                   </div>
                 </div>

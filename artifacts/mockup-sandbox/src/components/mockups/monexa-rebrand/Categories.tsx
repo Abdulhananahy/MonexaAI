@@ -34,7 +34,7 @@ export function Categories() {
   };
 
   return (
-    <div className="monexa-rebrand mx-phone relative bg-[var(--color-bg)] overflow-hidden flex flex-col font-sans">
+    <div className="monexa-rebrand mx-phone relative bg-[var(--mx-bg)] overflow-hidden flex flex-col font-sans">
       <style>{`
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
@@ -58,8 +58,8 @@ export function Categories() {
           <button className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors">
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-xl font-bold font-display text-[var(--color-text)]">Categories</h1>
-          <button className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity shadow-md">
+          <h1 className="text-xl font-bold font-display text-[var(--mx-ink)]">Categories</h1>
+          <button className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--mx-primary)] text-white hover:opacity-90 transition-opacity shadow-md">
             <Plus className="w-5 h-5" />
           </button>
         </div>
@@ -88,7 +88,7 @@ export function Categories() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto hide-scrollbar px-6 py-6 pb-24" onClick={() => setOpenMenuId(null)}>
         <div className="flex items-center gap-4 mb-8 bg-white p-4 rounded-3xl shadow-sm border border-gray-100 pop-in">
-          <div className="w-16 h-16 shrink-0 relative flex items-center justify-center rounded-full bg-[var(--color-accent)]/20">
+          <div className="w-16 h-16 shrink-0 relative flex items-center justify-center rounded-full bg-[var(--mx-gold-soft)]">
             <Mascot mood="happy" className="w-12 h-12" />
           </div>
           <div>

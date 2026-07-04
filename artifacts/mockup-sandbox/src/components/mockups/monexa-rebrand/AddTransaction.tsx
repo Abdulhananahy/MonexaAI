@@ -81,7 +81,7 @@ export function AddTransaction() {
       </div>
 
       {/* Categories */}
-      <div className="px-6 flex-1 bg-white rounded-t-[32px] pt-8 pb-32 shadow-[0_-8px_30px_rgba(76,63,145,0.08)] relative z-0">
+      <div className="px-6 flex-1 bg-white rounded-t-[32px] pt-8 pb-48 shadow-[0_-8px_30px_rgba(76,63,145,0.08)] relative z-0">
         <div className="flex items-center justify-between mb-6">
           <h2 className="mx-display text-lg font-bold">Category</h2>
           <button className="text-[var(--mx-primary)] font-bold text-sm flex items-center gap-1 bg-[var(--mx-primary-soft)] px-3 py-1.5 rounded-full active:scale-95 transition-transform hover:opacity-90">
@@ -128,7 +128,7 @@ export function AddTransaction() {
       </div>
 
       {/* Save Button (Fixed at bottom) */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-[400px] mx-auto p-6 bg-gradient-to-t from-white via-white to-transparent pt-12 z-10 pointer-events-none">
+      <div className="fixed bottom-0 left-0 right-0 max-w-[400px] mx-auto p-6 bg-gradient-to-t from-white from-60% via-white/95 to-transparent pt-16 z-10 pointer-events-none">
         <button 
           onClick={handleSave}
           className={`w-full py-4 rounded-2xl font-bold text-lg text-white shadow-lg pointer-events-auto transition-all active:scale-[0.98] flex items-center justify-center gap-2 hover:opacity-95 ${

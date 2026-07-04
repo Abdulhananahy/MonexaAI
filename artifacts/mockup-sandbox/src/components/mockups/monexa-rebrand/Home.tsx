@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, MessageCircle, ArrowRight } from 'lucide-react';
 import "./_shared/tokens.css";
 import { Mascot } from "./_shared/Mascot";
+import { BottomNav } from "./_shared/BottomNav";
 
 const TRANSACTIONS = [
   { id: 1, name: "Salary", category: "Income", emoji: "💼", amount: 3100.00, type: "income", date: "Today, 9:00 AM" },
@@ -13,7 +14,7 @@ const TRANSACTIONS = [
 
 export function Home() {
   return (
-    <div className="monexa-rebrand mx-phone flex flex-col h-full bg-[var(--mx-bg)] pb-[100px]">
+    <div className="monexa-rebrand mx-phone flex flex-col h-full bg-[var(--mx-bg)] pb-[76px]">
       
       {/* Header */}
       <header className="px-6 pt-12 pb-4 flex items-center justify-between">
@@ -33,7 +34,7 @@ export function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 px-6 flex flex-col gap-6 overflow-y-auto pb-6">
+      <main className="flex-1 px-6 flex flex-col gap-6 overflow-y-auto pb-40">
         
         {/* Balance Card */}
         <div 
@@ -130,36 +131,11 @@ export function Home() {
         </div>
       </main>
 
-      {/* Floating Action Buttons Area (Pinned) */}
+      {/* Chat CTA (Pinned above bottom nav) */}
       <div 
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[400px] px-6 py-6 pb-8 bg-gradient-to-t from-[var(--mx-bg)] via-[var(--mx-bg)] to-transparent pointer-events-none flex flex-col gap-4"
-        style={{ zIndex: 50 }}
+        className="fixed bottom-[76px] left-1/2 -translate-x-1/2 w-full max-w-[400px] px-6 pt-6 pb-4 bg-gradient-to-t from-[var(--mx-bg)] via-[var(--mx-bg)] to-transparent pointer-events-none"
+        style={{ zIndex: 45 }}
       >
-        <div className="flex items-center justify-between gap-3 pointer-events-auto">
-          {/* Add Expense */}
-          <button 
-            className="flex-1 h-14 bg-[var(--mx-bg-elevated)] text-[var(--mx-ink)] font-bold rounded-full flex items-center justify-center gap-2 shadow-[var(--mx-shadow-soft)] transition-transform active:scale-95"
-            style={{ borderRadius: "100px" }}
-          >
-            <div className="w-8 h-8 rounded-full bg-[var(--mx-expense-soft)] text-[var(--mx-expense)] flex items-center justify-center">
-              <ArrowUpFromLine className="w-4 h-4" />
-            </div>
-            Expense
-          </button>
-          
-          {/* Add Income */}
-          <button 
-            className="flex-1 h-14 bg-[var(--mx-bg-elevated)] text-[var(--mx-ink)] font-bold rounded-full flex items-center justify-center gap-2 shadow-[var(--mx-shadow-soft)] transition-transform active:scale-95"
-            style={{ borderRadius: "100px" }}
-          >
-            <div className="w-8 h-8 rounded-full bg-[var(--mx-income-soft)] text-[var(--mx-income)] flex items-center justify-center">
-              <ArrowDownToLine className="w-4 h-4" />
-            </div>
-            Income
-          </button>
-        </div>
-
-        {/* Ask Monexa Button */}
         <button 
           className="w-full h-14 text-white font-bold rounded-full flex items-center justify-center gap-3 shadow-[var(--mx-shadow)] transition-transform active:scale-95 pointer-events-auto overflow-hidden relative group"
           style={{ 
@@ -173,6 +149,7 @@ export function Home() {
         </button>
       </div>
 
+      <BottomNav active="home" />
     </div>
   );
 }
