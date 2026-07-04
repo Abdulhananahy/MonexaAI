@@ -16,6 +16,7 @@ from google import genai
 from google.genai import types
 import aiohttp
 import stripe
+import re
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -354,6 +355,21 @@ async def get_exchange_rate(from_currency: str, to_currency: str) -> float:
     except Exception as e:
         logger.error(f"Exchange rate fetch error: {str(e)}")
         return 1.0
+
+async def extract_amount(message: str, user_currency: str) -> Optional[float]:
+    """Find a numeric amount in a chat message. If the user explicitly wrote it with a
+    '$' sign or the words 'usd'/'dollars' and their account currency isn't USD, treat
+    the number as USD and convert it to the user's currency instead of misreading it
+    as already being in their currency."""
+    match = re.search(r'(\$)?\s*(\d+(?:\.\d{1,2})?)\s*(usd|dollars?)?', message, re.IGNORECASE)
+    if not match:
+        return None
+    amount = float(match.group(2))
+    is_explicit_usd = bool(match.group(1)) or bool(match.group(3))
+    if is_explicit_usd and user_currency != 'USD':
+        rate = await get_exchange_rate('USD', user_currency)
+        amount = amount * rate
+    return amount
 
 async def convert_user_transactions(user_id: str, from_currency: str, to_currency: str):
     """Convert all user transactions to new currency"""
@@ -821,8 +837,7 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         has_expense_category = any(cat in message_lower for cat in expense_categories) and 'expense' not in message_lower
         
         if any(word in message_lower for word in ['add', 'spent', 'bought', 'paid']) and (is_expense or has_expense_category):
-            import re
-            amount_match = re.search(r'\$?(\d+(?:\.\d{2})?)', request.message)
+            amount = await extract_amount(request.message, user_currency)
             # Try multiple patterns: "for food", "in food", "on food", or just the category word
             category_match = re.search(r'(?:for|in|on)\s+(\w+)', request.message, re.IGNORECASE)
             
@@ -841,9 +856,7 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
                         category = cat.capitalize()
                         break
             
-            if amount_match and category:
-                amount = float(amount_match.group(1))
-                
+            if amount is not None and category:
                 # Create transaction
                 await execute(
                     """INSERT INTO transactions (user_id, type, amount, category_name, date)
@@ -855,13 +868,11 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         
         # ADD INCOME - detect income keywords OR income categories like salary, freelance, etc.
         elif any(word in message_lower for word in ['earned', 'received', 'got paid', 'income', 'salary', 'freelance', 'bonus', 'investment', 'dividend', 'refund', 'gift']) and 'expense' not in message_lower:
-            import re
-            amount_match = re.search(r'\$?(\d+(?:\.\d{2})?)', request.message)
+            amount = await extract_amount(request.message, user_currency)
             # Try to find source from "from X" or "in X" or "as X"
             source_match = re.search(r'(?:from|in|as)\s+(\w+)', request.message, re.IGNORECASE)
             
-            if amount_match:
-                amount = float(amount_match.group(1))
+            if amount is not None:
                 # Determine source from match or from keywords in message
                 if source_match:
                     source = source_match.group(1).capitalize()
@@ -885,18 +896,15 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         
         # SET BUDGET
         elif any(word in message_lower for word in ['budget', 'limit']):
-            import re
-            amount_match = re.search(r'\$?(\d+(?:\.\d{2})?)', request.message)
+            budget = await extract_amount(request.message, user_currency)
             
-            if amount_match:
-                budget = float(amount_match.group(1))
+            if budget is not None:
                 await execute("UPDATE users SET monthly_budget = $1 WHERE id = $2::uuid", budget, current_user["id"])
                 action_performed = True
                 action_response = f"✅ Monthly budget set to {fmt_amount(budget, user_currency)}."
         
         # CREATE CATEGORY
         elif 'add category' in message_lower or 'new category' in message_lower or 'create category' in message_lower:
-            import re
             category_match = re.search(r'category\s+(\w+)', request.message, re.IGNORECASE)
             
             if category_match:
