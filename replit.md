@@ -37,6 +37,7 @@ For full functionality, set these in the Secrets tab:
 | DATABASE_URL | Yes | Replit-managed PostgreSQL connection string (auto-provisioned) |
 | AI_INTEGRATIONS_GEMINI_* | Auto | Set automatically by Replit AI Integrations |
 | STRIPE_SECRET_KEY | No | Stripe secret key for payments |
+| STRIPE_WEBHOOK_SECRET | Yes (for webhooks) | Stripe webhook signing secret (starts with `whsec_`) — required for `/api/webhooks/stripe` to accept events; endpoint returns 503 without it |
 | JWT_SECRET_KEY | No | JWT signing key (auto-generated if not set) |
 
 ### Running Locally
@@ -92,6 +93,9 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Currency consistency fix: chat responses, action confirmations, and the AI system prompt in `backend/server.py` now use the user's actual currency symbol (via `CURRENCY_SYMBOLS`/`get_currency_symbol`/`fmt_amount` helpers) instead of a hardcoded `$`. Frontend screens (home, transactions, budget, preferences, insights) now use a shared `getCurrencySymbol()` helper from `frontend/utils/format.ts` instead of ad-hoc "show $ only if USD" checks.
 - Removed the non-functional "Continue with Google" button from the login screen (had no `onPress` handler — dead UI element flagged in founder review). Google sign-in is not implemented; email/password remains the only auth method.
 - Demo account (`demo@monexa.app`) intentionally uses PKR with a matching realistic budget to showcase multi-currency support in demos; this is a deliberate choice, not leftover test data.
+- Monetization polish: added `/api/subscription/pricing` (USD price + live-converted local-currency estimate) surfaced on the upgrade screen; cancel dialog on manage-subscription now explicitly discloses no-refund-for-current-period at the point of action; payment-success screen polls `/subscription/current` (up to 5x) before declaring success instead of assuming the webhook already landed, with honest fallback copy if it hasn't.
+- Mobile visual QA fixes: upgrade screen's price block was restructured from a row layout with an invalid `width:'100%'` child to a column layout, so the converted-currency subtext (e.g. "≈ ₨2,502.54/mo") stacks correctly instead of risking overlap/collapse; payment-success screen content wrapped in a ScrollView so it doesn't clip on small phones (iPhone SE-class devices).
+- Closed the Stripe webhook fraud gap: `/api/webhooks/stripe` now hard-rejects any request without a valid signature (400) or when `STRIPE_WEBHOOK_SECRET` isn't configured (503), instead of silently falling back to processing unverified payloads. `STRIPE_WEBHOOK_SECRET` is now set; verified live that unsigned/fake requests are rejected.
 
 ## Subscription Tiers
 - **Free**: 10 AI messages/day, no charts, no export
