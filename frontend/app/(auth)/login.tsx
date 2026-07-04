@@ -128,19 +128,6 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.divider} />
-            </View>
-
-            <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-google" size={20} color={COLORS.ink} />
-                <Text style={styles.socialButtonText}>Continue with Google</Text>
-              </TouchableOpacity>
-            </View>
-
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account? </Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
@@ -278,42 +265,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontFamily: FONTS.bodyBold,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  divider: {
-    flex: 1,
-    height: 2,
-    backgroundColor: COLORS.ink,
-    opacity: 0.1,
-  },
-  dividerText: {
-    paddingHorizontal: 16,
-    fontSize: 14,
-    fontFamily: FONTS.bodyBold,
-    color: COLORS.ink,
-    opacity: 0.4,
-  },
-  socialButtons: {
-    gap: 12,
-  },
-  socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.bgElevated,
-    height: 56,
-    borderRadius: RADIUS.card,
-    gap: 12,
-    ...SHADOW.soft,
-  },
-  socialButtonText: {
-    fontSize: 16,
-    fontFamily: FONTS.bodyBold,
-    color: COLORS.ink,
   },
   signupContainer: {
     flexDirection: 'row',
