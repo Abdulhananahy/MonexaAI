@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
 import { format } from 'date-fns';
 import { COLORS, RADIUS, SHADOW, FONTS } from '../constants/theme';
+import { useAuth } from '../contexts/AuthContext';
+import { getCurrencySymbol } from '../utils/format';
 
 interface Category {
   id: string;
@@ -38,6 +40,7 @@ const INCOME_SOURCES = [
 
 export default function AddTransactionScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -192,7 +195,7 @@ export default function AddTransactionScreen() {
           <View style={styles.amountContainer}>
             <Text style={styles.labelAmount}>Amount</Text>
             <View style={styles.amountInputRow}>
-              <Text style={[styles.currencyPrefix, { color: type === 'expense' ? COLORS.expense : COLORS.income }]}>$</Text>
+              <Text style={[styles.currencyPrefix, { color: type === 'expense' ? COLORS.expense : COLORS.income }]}>{getCurrencySymbol(user?.currency)}</Text>
               <TextInput
                 style={styles.amountInput}
                 placeholder="0.00"
