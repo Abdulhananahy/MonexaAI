@@ -6,7 +6,7 @@ Monexa is a mobile-first personal finance application built with React Native (E
 ## Tech Stack
 - **Frontend**: React Native with Expo (TypeScript)
 - **Backend**: FastAPI (Python 3.11)
-- **Database**: MongoDB (external - requires MONGO_URL)
+- **Database**: Replit-managed PostgreSQL (accessed via `DATABASE_URL`, using `asyncpg`)
 - **AI**: Google Gemini via Replit AI Integrations (no API key needed)
 - **Payments**: Stripe
 
@@ -34,8 +34,7 @@ For full functionality, set these in the Secrets tab:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| MONGO_URL | Yes | MongoDB Atlas connection string |
-| DB_NAME | No | Database name (default: "monexa") |
+| DATABASE_URL | Yes | Replit-managed PostgreSQL connection string (auto-provisioned) |
 | AI_INTEGRATIONS_GEMINI_* | Auto | Set automatically by Replit AI Integrations |
 | STRIPE_SECRET_KEY | No | Stripe secret key for payments |
 | JWT_SECRET_KEY | No | JWT signing key (auto-generated if not set) |
@@ -54,7 +53,7 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 
 2. **Mobile-First**: This app is designed primarily for mobile. Full functionality is tested via Expo Go on iOS/Android.
 
-3. **Database Required**: Most features require a MongoDB connection. Without it, the app shows the UI but can't persist data.
+3. **Database**: Uses Replit's built-in PostgreSQL database (auto-provisioned, `DATABASE_URL` set automatically). No external database setup required.
 
 ## Recent Changes
 - Replaced `emergentintegrations` library with direct OpenAI AsyncOpenAI client
@@ -86,6 +85,7 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Fixed Stripe credential fetching to read from both 'secrets' and 'settings' keys
 - Fixed promo code validation to accept Query parameters matching frontend usage
 - Switched AI from OpenAI to Google Gemini using Replit AI Integrations (no external API key required, billed to Replit credits)
+- Migrated entire backend from MongoDB to Replit-managed PostgreSQL after the external MongoDB Atlas cluster went permanently unreachable (DNS NXDOMAIN). Rewrote all data access in `server.py` to use `asyncpg` with UUID primary keys; schema covers users, transactions, categories, chat_messages, chat_archives/chat_archive_messages, and subscriptions. Removed motor/pymongo/dnspython dependencies.
 
 ## Subscription Tiers
 - **Free**: 10 AI messages/day, no charts, no export

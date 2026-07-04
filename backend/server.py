@@ -2,13 +2,13 @@ from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Query, R
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+import asyncpg
 from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from bson import ObjectId
+import uuid as uuid_module
 import os
 import logging
 from pathlib import Path
@@ -132,22 +132,56 @@ async def send_ai_message(system_message: str, user_message: str) -> str:
         logger.error(f"Gemini error: {str(e)}")
         return "I'm having trouble processing your request right now. Please try again."
 
-# MongoDB connection
-import certifi
-import ssl
-mongo_url = os.environ.get('MONGO_URL', '')
-db_name = os.environ.get('DB_NAME', 'monexa')
-if mongo_url:
-    if '?' in mongo_url:
-        mongo_url_with_tls = mongo_url + '&tls=true&tlsAllowInvalidCertificates=true'
-    else:
-        mongo_url_with_tls = mongo_url + '?tls=true&tlsAllowInvalidCertificates=true'
-    client = AsyncIOMotorClient(mongo_url_with_tls)
-    db = client[db_name]
-else:
-    client = None
-    db = None
-    print("WARNING: MONGO_URL not set. Database features will not work.")
+# ============ POSTGRESQL CONNECTION (Replit-managed database) ============
+
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+db_pool: Optional[asyncpg.Pool] = None
+
+if not DATABASE_URL:
+    print("WARNING: DATABASE_URL not set. Database features will not work.")
+
+async def fetchrow(query: str, *args):
+    """Run a query and return a single row as a dict, or None."""
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database is not available")
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(query, *args)
+        return dict(row) if row is not None else None
+
+async def fetch(query: str, *args):
+    """Run a query and return all rows as a list of dicts."""
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database is not available")
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch(query, *args)
+        return [dict(r) for r in rows]
+
+async def execute(query: str, *args) -> str:
+    """Run a mutating query and return the status string (e.g. 'DELETE 1')."""
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database is not available")
+    async with db_pool.acquire() as conn:
+        return await conn.execute(query, *args)
+
+def row_to_dict(row: Optional[dict]) -> Optional[dict]:
+    """Convert asyncpg row values (UUID) into JSON-safe python types."""
+    if row is None:
+        return None
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, uuid_module.UUID):
+            out[k] = str(v)
+        else:
+            out[k] = v
+    return out
+
+def validate_uuid(value: str, detail: str = "Resource not found") -> str:
+    """Ensure a path/user-supplied id is a syntactically valid UUID before querying."""
+    try:
+        uuid_module.UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=404, detail=detail)
+    return value
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'monexa_jwt_secret_key_2025')
@@ -309,23 +343,13 @@ async def convert_user_transactions(user_id: str, from_currency: str, to_currenc
     rate = await get_exchange_rate(from_currency, to_currency)
     
     # Update all transactions
-    transactions = await db.transactions.find({"user_id": user_id}).to_list(10000)
-    
-    for transaction in transactions:
-        new_amount = transaction['amount'] * rate
-        await db.transactions.update_one(
-            {"_id": transaction["_id"]},
-            {"$set": {"amount": new_amount}}
-        )
+    await execute("UPDATE transactions SET amount = amount * $1 WHERE user_id = $2::uuid", rate, user_id)
     
     # Update budget if exists
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    user = await fetchrow("SELECT monthly_budget FROM users WHERE id = $1::uuid", user_id)
     if user and user.get('monthly_budget'):
         new_budget = user['monthly_budget'] * rate
-        await db.users.update_one(
-            {"_id": ObjectId(user_id)},
-            {"$set": {"monthly_budget": new_budget}}
-        )
+        await execute("UPDATE users SET monthly_budget = $1 WHERE id = $2::uuid", new_budget, user_id)
 
 def get_subscription_limits(plan_type: str) -> dict:
     """Get feature limits based on subscription plan"""
@@ -356,10 +380,9 @@ def get_subscription_limits(plan_type: str) -> dict:
 
 async def check_ai_message_limit(user_id: str) -> bool:
     """Check if user has exceeded AI message limit"""
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
-    subscription = await db.subscriptions.find_one({"user_id": user_id, "status": "active"})
+    subscription = await fetchrow("SELECT plan_type FROM subscriptions WHERE user_id = $1::uuid AND status = 'active'", user_id)
     
-    plan_type = subscription.get("plan_type", "free") if subscription else "free"
+    plan_type = subscription["plan_type"] if subscription else "free"
     limits = get_subscription_limits(plan_type)
     
     if limits["ai_messages_per_day"] == -1:
@@ -367,11 +390,11 @@ async def check_ai_message_limit(user_id: str) -> bool:
     
     # Count messages today
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    message_count = await db.chat_messages.count_documents({
-        "user_id": user_id,
-        "role": "user",
-        "created_at": {"$gte": today_start}
-    })
+    count_row = await fetchrow(
+        "SELECT COUNT(*) as cnt FROM chat_messages WHERE user_id = $1::uuid AND role = 'user' AND created_at >= $2",
+        user_id, today_start
+    )
+    message_count = count_row["cnt"] if count_row else 0
     
     return message_count < limits["ai_messages_per_day"]
 
@@ -396,23 +419,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid authentication credentials")
         
-        user = await db.users.find_one({"_id": ObjectId(user_id)})
-        if user is None:
+        try:
+            uuid_module.UUID(user_id)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        
+        row = await fetchrow("SELECT * FROM users WHERE id = $1::uuid", user_id)
+        if row is None:
             raise HTTPException(status_code=401, detail="User not found")
         
-        user["id"] = str(user["_id"])
-        del user["_id"]
-        return user
+        return row_to_dict(row)
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
-
-def serialize_mongo_doc(doc):
-    """Convert MongoDB document to JSON-serializable dict"""
-    if doc is None:
-        return None
-    doc["id"] = str(doc["_id"])
-    del doc["_id"]
-    return doc
 
 # ============ SEED DEFAULT CATEGORIES ============
 
@@ -428,35 +446,28 @@ async def seed_default_categories(user_id: str):
     ]
     
     for cat in default_categories:
-        category = {
-            "user_id": user_id,
-            "name": cat["name"],
-            "icon": cat["icon"],
-            "created_at": datetime.utcnow()
-        }
-        await db.categories.insert_one(category)
+        await execute(
+            "INSERT INTO categories (user_id, name, icon) VALUES ($1::uuid, $2, $3)",
+            user_id, cat["name"], cat["icon"]
+        )
 
 # ============ AUTH ROUTES ============
 
 @api_router.post("/auth/signup", response_model=TokenResponse)
 async def signup(user_data: UserSignup):
     # Check if user exists
-    existing_user = await db.users.find_one({"email": user_data.email})
+    existing_user = await fetchrow("SELECT id FROM users WHERE email = $1", user_data.email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
     # Create user
-    user_dict = {
-        "full_name": user_data.full_name,
-        "email": user_data.email,
-        "password_hash": hash_password(user_data.password),
-        "currency": "USD",
-        "monthly_budget": None,
-        "created_at": datetime.utcnow()
-    }
-    
-    result = await db.users.insert_one(user_dict)
-    user_id = str(result.inserted_id)
+    password_hash = hash_password(user_data.password)
+    row = await fetchrow(
+        """INSERT INTO users (full_name, email, password_hash, currency)
+           VALUES ($1, $2, $3, 'USD') RETURNING id""",
+        user_data.full_name, user_data.email, password_hash
+    )
+    user_id = str(row["id"])
     
     # Seed default categories
     await seed_default_categories(user_id)
@@ -477,11 +488,11 @@ async def signup(user_data: UserSignup):
 
 @api_router.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
-    user = await db.users.find_one({"email": credentials.email})
+    user = await fetchrow("SELECT * FROM users WHERE email = $1", credentials.email)
     if not user or not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    user_id = str(user["_id"])
+    user_id = str(user["id"])
     access_token = create_access_token(data={"sub": user_id})
     
     return {
@@ -497,7 +508,7 @@ async def login(credentials: UserLogin):
 
 @api_router.post("/auth/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
-    user = await db.users.find_one({"email": request.email})
+    user = await fetchrow("SELECT id FROM users WHERE email = $1", request.email)
     if not user:
         # Don't reveal if email exists
         return {"message": "If the email exists, a password reset link has been sent"}
@@ -517,14 +528,12 @@ async def update_profile(
     if not full_name:
         raise HTTPException(status_code=400, detail="Name cannot be empty")
 
-    await db.users.update_one(
-        {"_id": ObjectId(current_user["id"])},
-        {"$set": {"full_name": full_name}}
+    updated_user = await fetchrow(
+        "UPDATE users SET full_name = $1 WHERE id = $2::uuid RETURNING *",
+        full_name, current_user["id"]
     )
-
-    updated_user = await db.users.find_one({"_id": ObjectId(current_user["id"])})
     return {
-        "id": str(updated_user["_id"]),
+        "id": str(updated_user["id"]),
         "full_name": updated_user["full_name"],
         "email": updated_user["email"],
         "currency": updated_user.get("currency", "USD"),
@@ -536,7 +545,7 @@ async def change_password(
     current_user: dict = Depends(get_current_user)
 ):
     """Change the current user's password after verifying the current one"""
-    user_doc = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+    user_doc = await fetchrow("SELECT password_hash FROM users WHERE id = $1::uuid", current_user["id"])
     if not user_doc or not verify_password(request.current_password, user_doc["password_hash"]):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
@@ -544,10 +553,7 @@ async def change_password(
         raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
 
     new_hash = hash_password(request.new_password)
-    await db.users.update_one(
-        {"_id": ObjectId(current_user["id"])},
-        {"$set": {"password_hash": new_hash}}
-    )
+    await execute("UPDATE users SET password_hash = $1 WHERE id = $2::uuid", new_hash, current_user["id"])
     return {"message": "Password changed successfully"}
 
 @api_router.get("/auth/me")
@@ -564,48 +570,50 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/transactions", response_model=List[Transaction])
 async def get_transactions(current_user: dict = Depends(get_current_user)):
-    transactions = await db.transactions.find({"user_id": current_user["id"]}).sort("date", -1).to_list(1000)
-    return [serialize_mongo_doc(t) for t in transactions]
+    rows = await fetch(
+        "SELECT * FROM transactions WHERE user_id = $1::uuid ORDER BY date DESC, created_at DESC",
+        current_user["id"]
+    )
+    return [row_to_dict(t) for t in rows]
 
 @api_router.post("/transactions", response_model=Transaction)
 async def create_transaction(transaction: TransactionCreate, current_user: dict = Depends(get_current_user)):
-    transaction_dict = transaction.dict()
-    transaction_dict["user_id"] = current_user["id"]
-    transaction_dict["created_at"] = datetime.utcnow()
-    
-    result = await db.transactions.insert_one(transaction_dict)
-    transaction_dict["id"] = str(result.inserted_id)
-    if "_id" in transaction_dict:
-        del transaction_dict["_id"]
-    
-    return transaction_dict
+    row = await fetchrow(
+        """INSERT INTO transactions (user_id, type, amount, category_name, income_source, date, note)
+           VALUES ($1::uuid, $2, $3, $4, $5, $6, $7) RETURNING *""",
+        current_user["id"], transaction.type, transaction.amount, transaction.category_name,
+        transaction.income_source, transaction.date, transaction.note
+    )
+    return row_to_dict(row)
 
 @api_router.put("/transactions/{transaction_id}", response_model=Transaction)
 async def update_transaction(transaction_id: str, transaction: TransactionCreate, current_user: dict = Depends(get_current_user)):
+    validate_uuid(transaction_id, "Transaction not found")
     # Check ownership
-    existing = await db.transactions.find_one({"_id": ObjectId(transaction_id), "user_id": current_user["id"]})
+    existing = await fetchrow(
+        "SELECT id FROM transactions WHERE id = $1::uuid AND user_id = $2::uuid",
+        transaction_id, current_user["id"]
+    )
     if not existing:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
-    update_data = transaction.dict()
-    update_data["updated_at"] = datetime.utcnow()
-    
-    await db.transactions.update_one(
-        {"_id": ObjectId(transaction_id)},
-        {"$set": update_data}
+    updated = await fetchrow(
+        """UPDATE transactions
+           SET type = $1, amount = $2, category_name = $3, income_source = $4, date = $5, note = $6, updated_at = now()
+           WHERE id = $7::uuid RETURNING *""",
+        transaction.type, transaction.amount, transaction.category_name,
+        transaction.income_source, transaction.date, transaction.note, transaction_id
     )
-    
-    updated = await db.transactions.find_one({"_id": ObjectId(transaction_id)})
-    return serialize_mongo_doc(updated)
+    return row_to_dict(updated)
 
 @api_router.get("/transactions/export")
 async def export_transactions_csv(current_user: dict = Depends(get_current_user)):
     """Export all user transactions as CSV. Requires export_enabled entitlement (Pro plan)."""
-    subscription = await db.subscriptions.find_one({
-        "user_id": current_user["id"],
-        "status": "active"
-    })
-    plan_type = subscription.get("plan_type", "free") if subscription else "free"
+    subscription = await fetchrow(
+        "SELECT plan_type FROM subscriptions WHERE user_id = $1::uuid AND status = 'active'",
+        current_user["id"]
+    )
+    plan_type = subscription["plan_type"] if subscription else "free"
     limits = get_subscription_limits(plan_type)
 
     if not limits.get("export_enabled"):
@@ -614,7 +622,10 @@ async def export_transactions_csv(current_user: dict = Depends(get_current_user)
             detail="CSV export is a Pro feature. Upgrade your plan to export transactions."
         )
 
-    transactions = await db.transactions.find({"user_id": current_user["id"]}).sort("date", -1).to_list(10000)
+    transactions = await fetch(
+        "SELECT * FROM transactions WHERE user_id = $1::uuid ORDER BY date DESC",
+        current_user["id"]
+    )
 
     import csv
     import io
@@ -645,8 +656,12 @@ async def export_transactions_csv(current_user: dict = Depends(get_current_user)
 
 @api_router.delete("/transactions/{transaction_id}")
 async def delete_transaction(transaction_id: str, current_user: dict = Depends(get_current_user)):
-    result = await db.transactions.delete_one({"_id": ObjectId(transaction_id), "user_id": current_user["id"]})
-    if result.deleted_count == 0:
+    validate_uuid(transaction_id, "Transaction not found")
+    result = await execute(
+        "DELETE FROM transactions WHERE id = $1::uuid AND user_id = $2::uuid",
+        transaction_id, current_user["id"]
+    )
+    if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Transaction not found")
     return {"message": "Transaction deleted successfully"}
 
@@ -664,7 +679,7 @@ DEFAULT_INCOME_CATEGORIES = [
 
 @api_router.get("/categories", response_model=List[Category])
 async def get_categories(current_user: dict = Depends(get_current_user)):
-    categories = await db.categories.find({"user_id": current_user["id"]}).to_list(1000)
+    categories = await fetch("SELECT * FROM categories WHERE user_id = $1::uuid", current_user["id"])
     
     # Check if user has any income categories
     has_income_categories = any(c.get("type") == "income" for c in categories)
@@ -672,24 +687,23 @@ async def get_categories(current_user: dict = Depends(get_current_user)):
     # Auto-create default income categories if none exist
     if not has_income_categories:
         for default_cat in DEFAULT_INCOME_CATEGORIES:
-            existing = await db.categories.find_one({
-                "user_id": current_user["id"],
-                "name": default_cat["name"]
-            })
+            existing = await fetchrow(
+                "SELECT id FROM categories WHERE user_id = $1::uuid AND name = $2",
+                current_user["id"], default_cat["name"]
+            )
             if not existing:
-                cat_doc = {
-                    **default_cat,
-                    "user_id": current_user["id"],
-                    "created_at": datetime.utcnow()
-                }
-                await db.categories.insert_one(cat_doc)
+                await execute(
+                    "INSERT INTO categories (user_id, name, type, icon, color) VALUES ($1::uuid, $2, $3, $4, $5)",
+                    current_user["id"], default_cat["name"], default_cat["type"],
+                    default_cat["icon"], default_cat["color"]
+                )
         
         # Re-fetch categories after creating defaults
-        categories = await db.categories.find({"user_id": current_user["id"]}).to_list(1000)
+        categories = await fetch("SELECT * FROM categories WHERE user_id = $1::uuid", current_user["id"])
     
     result = []
     for c in categories:
-        doc = serialize_mongo_doc(c)
+        doc = row_to_dict(c)
         if 'type' not in doc or not doc['type']:
             doc['type'] = 'expense'
         result.append(doc)
@@ -698,39 +712,43 @@ async def get_categories(current_user: dict = Depends(get_current_user)):
 @api_router.post("/categories", response_model=Category)
 async def create_category(category: CategoryCreate, current_user: dict = Depends(get_current_user)):
     # Check if category name already exists for user
-    existing = await db.categories.find_one({"user_id": current_user["id"], "name": category.name})
+    existing = await fetchrow(
+        "SELECT id FROM categories WHERE user_id = $1::uuid AND name = $2",
+        current_user["id"], category.name
+    )
     if existing:
         raise HTTPException(status_code=400, detail="Category already exists")
     
-    category_dict = category.dict()
-    category_dict["user_id"] = current_user["id"]
-    category_dict["created_at"] = datetime.utcnow()
-    
-    result = await db.categories.insert_one(category_dict)
-    category_dict["id"] = str(result.inserted_id)
-    if "_id" in category_dict:
-        del category_dict["_id"]
-    
-    return category_dict
+    row = await fetchrow(
+        "INSERT INTO categories (user_id, name, type, icon) VALUES ($1::uuid, $2, $3, $4) RETURNING *",
+        current_user["id"], category.name, category.type, category.icon
+    )
+    return row_to_dict(row)
 
 @api_router.put("/categories/{category_id}", response_model=Category)
 async def update_category(category_id: str, category: CategoryCreate, current_user: dict = Depends(get_current_user)):
-    existing = await db.categories.find_one({"_id": ObjectId(category_id), "user_id": current_user["id"]})
+    validate_uuid(category_id, "Category not found")
+    existing = await fetchrow(
+        "SELECT id FROM categories WHERE id = $1::uuid AND user_id = $2::uuid",
+        category_id, current_user["id"]
+    )
     if not existing:
         raise HTTPException(status_code=404, detail="Category not found")
     
-    await db.categories.update_one(
-        {"_id": ObjectId(category_id)},
-        {"$set": category.dict()}
+    updated = await fetchrow(
+        "UPDATE categories SET name = $1, type = $2, icon = $3 WHERE id = $4::uuid RETURNING *",
+        category.name, category.type, category.icon, category_id
     )
-    
-    updated = await db.categories.find_one({"_id": ObjectId(category_id)})
-    return serialize_mongo_doc(updated)
+    return row_to_dict(updated)
 
 @api_router.delete("/categories/{category_id}")
 async def delete_category(category_id: str, current_user: dict = Depends(get_current_user)):
-    result = await db.categories.delete_one({"_id": ObjectId(category_id), "user_id": current_user["id"]})
-    if result.deleted_count == 0:
+    validate_uuid(category_id, "Category not found")
+    result = await execute(
+        "DELETE FROM categories WHERE id = $1::uuid AND user_id = $2::uuid",
+        category_id, current_user["id"]
+    )
+    if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Category not found")
     return {"message": "Category deleted successfully"}
 
@@ -742,11 +760,11 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         # Check AI message limit
         can_send = await check_ai_message_limit(current_user["id"])
         if not can_send:
-            subscription = await db.subscriptions.find_one({
-                "user_id": current_user["id"],
-                "status": "active"
-            })
-            plan_type = subscription.get("plan_type", "free") if subscription else "free"
+            subscription = await fetchrow(
+                "SELECT plan_type FROM subscriptions WHERE user_id = $1::uuid AND status = 'active'",
+                current_user["id"]
+            )
+            plan_type = subscription["plan_type"] if subscription else "free"
             limits = get_subscription_limits(plan_type)
             
             raise HTTPException(
@@ -755,17 +773,14 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
             )
         
         # Get chat history to check if this is first message
-        existing_messages = await db.chat_messages.find({"user_id": current_user["id"]}).to_list(1000)
+        existing_messages = await fetch("SELECT id FROM chat_messages WHERE user_id = $1::uuid", current_user["id"])
         is_first_message = len(existing_messages) == 0
         
         # Save user message
-        user_message_doc = {
-            "user_id": current_user["id"],
-            "role": "user",
-            "text": request.message,
-            "created_at": datetime.utcnow()
-        }
-        await db.chat_messages.insert_one(user_message_doc)
+        await execute(
+            "INSERT INTO chat_messages (user_id, role, text) VALUES ($1::uuid, 'user', $2)",
+            current_user["id"], request.message
+        )
         
         # Check for action commands BEFORE sending to AI
         message_lower = request.message.lower()
@@ -808,15 +823,11 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
                 amount = float(amount_match.group(1))
                 
                 # Create transaction
-                transaction = {
-                    "user_id": current_user["id"],
-                    "type": "expense",
-                    "amount": amount,
-                    "category_name": category,
-                    "date": datetime.utcnow().strftime("%Y-%m-%d"),
-                    "created_at": datetime.utcnow()
-                }
-                await db.transactions.insert_one(transaction)
+                await execute(
+                    """INSERT INTO transactions (user_id, type, amount, category_name, date)
+                       VALUES ($1::uuid, 'expense', $2, $3, $4)""",
+                    current_user["id"], amount, category, datetime.utcnow().strftime("%Y-%m-%d")
+                )
                 action_performed = True
                 action_response = f"✅ Added ${amount} expense for {category}."
         
@@ -842,16 +853,11 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
                         source = "Other"
                 
                 # Create transaction
-                transaction = {
-                    "user_id": current_user["id"],
-                    "type": "income",
-                    "amount": amount,
-                    "category_name": "Income",
-                    "income_source": source,
-                    "date": datetime.utcnow().strftime("%Y-%m-%d"),
-                    "created_at": datetime.utcnow()
-                }
-                await db.transactions.insert_one(transaction)
+                await execute(
+                    """INSERT INTO transactions (user_id, type, amount, category_name, income_source, date)
+                       VALUES ($1::uuid, 'income', $2, 'Income', $3, $4)""",
+                    current_user["id"], amount, source, datetime.utcnow().strftime("%Y-%m-%d")
+                )
                 action_performed = True
                 action_response = f"✅ Added ${amount} income from {source}."
         
@@ -862,10 +868,7 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
             
             if amount_match:
                 budget = float(amount_match.group(1))
-                await db.users.update_one(
-                    {"_id": ObjectId(current_user["id"])},
-                    {"$set": {"monthly_budget": budget}}
-                )
+                await execute("UPDATE users SET monthly_budget = $1 WHERE id = $2::uuid", budget, current_user["id"])
                 action_performed = True
                 action_response = f"✅ Monthly budget set to ${budget}."
         
@@ -878,14 +881,15 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
                 category_name = category_match.group(1).capitalize()
                 
                 # Check if exists
-                existing = await db.categories.find_one({"user_id": current_user["id"], "name": category_name})
+                existing = await fetchrow(
+                    "SELECT id FROM categories WHERE user_id = $1::uuid AND name = $2",
+                    current_user["id"], category_name
+                )
                 if not existing:
-                    category = {
-                        "user_id": current_user["id"],
-                        "name": category_name,
-                        "created_at": datetime.utcnow()
-                    }
-                    await db.categories.insert_one(category)
+                    await execute(
+                        "INSERT INTO categories (user_id, name) VALUES ($1::uuid, $2)",
+                        current_user["id"], category_name
+                    )
                     action_performed = True
                     action_response = f"✅ Created category '{category_name}'."
                 else:
@@ -894,7 +898,7 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
         # If action was performed, send simpler context to AI
         if action_performed:
             # Still get updated data
-            transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
+            transactions = await fetch("SELECT * FROM transactions WHERE user_id = $1::uuid", current_user["id"])
             total_income = sum(t["amount"] for t in transactions if t["type"] == "income")
             total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense")
             
@@ -912,41 +916,27 @@ Respond with ONE supportive sentence about this action."""
             else:
                 full_response = action_response
             
-            ai_message_doc = {
-                "user_id": current_user["id"],
-                "role": "assistant",
-                "text": full_response,
-                "created_at": datetime.utcnow()
-            }
-            await db.chat_messages.insert_one(ai_message_doc)
+            await execute(
+                "INSERT INTO chat_messages (user_id, role, text) VALUES ($1::uuid, 'assistant', $2)",
+                current_user["id"], full_response
+            )
             return {"message": full_response}
         
         # Check if user is setting tone preference
         if any(word in message_lower for word in ['strict', 'funny', 'friendly']):
             if 'strict' in message_lower:
                 tone = 'strict'
-                await db.users.update_one(
-                    {"_id": ObjectId(current_user["id"])},
-                    {"$set": {"chat_tone": "strict"}}
-                )
             elif 'funny' in message_lower:
                 tone = 'funny'
-                await db.users.update_one(
-                    {"_id": ObjectId(current_user["id"])},
-                    {"$set": {"chat_tone": "funny"}}
-                )
             else:
                 tone = 'friendly'
-                await db.users.update_one(
-                    {"_id": ObjectId(current_user["id"])},
-                    {"$set": {"chat_tone": "friendly"}}
-                )
+            await execute("UPDATE users SET chat_tone = $1 WHERE id = $2::uuid", tone, current_user["id"])
         else:
             tone = current_user.get('chat_tone', 'friendly')
         
         # Get user context: transactions and categories
-        transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
-        categories = await db.categories.find({"user_id": current_user["id"]}).to_list(100)
+        transactions = await fetch("SELECT * FROM transactions WHERE user_id = $1::uuid", current_user["id"])
+        categories = await fetch("SELECT * FROM categories WHERE user_id = $1::uuid", current_user["id"])
         
         # Calculate comprehensive financial data
         total_income = sum(t["amount"] for t in transactions if t["type"] == "income")
@@ -1026,13 +1016,10 @@ How should I talk to you?
 
 What would you like to explore first?"""
             
-            ai_message_doc = {
-                "user_id": current_user["id"],
-                "role": "assistant",
-                "text": intro_response,
-                "created_at": datetime.utcnow()
-            }
-            await db.chat_messages.insert_one(ai_message_doc)
+            await execute(
+                "INSERT INTO chat_messages (user_id, role, text) VALUES ($1::uuid, 'assistant', $2)",
+                current_user["id"], intro_response
+            )
             return {"message": intro_response}
         
         # Build context based on tone
@@ -1075,58 +1062,68 @@ RESPONSE FORMAT:
 
 Now respond to their message with your {tone} tone!"""
 
-        # Send message to OpenAI
+        # Send message to Gemini
         ai_response = await send_ai_message(context, request.message)
         
         # Save AI response
-        ai_message_doc = {
-            "user_id": current_user["id"],
-            "role": "assistant",
-            "text": ai_response,
-            "created_at": datetime.utcnow()
-        }
-        await db.chat_messages.insert_one(ai_message_doc)
+        await execute(
+            "INSERT INTO chat_messages (user_id, role, text) VALUES ($1::uuid, 'assistant', $2)",
+            current_user["id"], ai_response
+        )
         
         return {"message": ai_response}
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI chat error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to process chat request")
 
 @api_router.get("/chat/history")
 async def get_chat_history(current_user: dict = Depends(get_current_user)):
-    messages = await db.chat_messages.find({"user_id": current_user["id"]}).sort("created_at", 1).to_list(1000)
-    return [serialize_mongo_doc(m) for m in messages]
+    messages = await fetch(
+        "SELECT * FROM chat_messages WHERE user_id = $1::uuid ORDER BY created_at ASC",
+        current_user["id"]
+    )
+    return [row_to_dict(m) for m in messages]
 
 @api_router.delete("/chat/history")
 async def clear_chat_history(current_user: dict = Depends(get_current_user)):
     """Delete all chat messages for user"""
-    result = await db.chat_messages.delete_many({"user_id": current_user["id"]})
-    return {"message": "Chat history cleared", "deleted_count": result.deleted_count}
+    result = await execute("DELETE FROM chat_messages WHERE user_id = $1::uuid", current_user["id"])
+    deleted_count = int(result.split(" ")[1]) if result.startswith("DELETE") else 0
+    return {"message": "Chat history cleared", "deleted_count": deleted_count}
 
 @api_router.post("/chat/archive")
 async def archive_chat_session(current_user: dict = Depends(get_current_user)):
     """Archive current chat and start fresh"""
     # Get all current messages
-    messages = await db.chat_messages.find({"user_id": current_user["id"]}).to_list(10000)
+    messages = await fetch(
+        "SELECT * FROM chat_messages WHERE user_id = $1::uuid ORDER BY created_at ASC",
+        current_user["id"]
+    )
     
     if len(messages) > 0:
         # Create archive record
-        archive = {
-            "user_id": current_user["id"],
-            "messages": messages,
-            "archived_at": datetime.utcnow(),
-            "message_count": len(messages)
-        }
-        await db.chat_archives.insert_one(archive)
+        archive_row = await fetchrow(
+            "INSERT INTO chat_archives (user_id, message_count) VALUES ($1::uuid, $2) RETURNING id",
+            current_user["id"], len(messages)
+        )
+        archive_id = archive_row["id"]
+        
+        for m in messages:
+            await execute(
+                "INSERT INTO chat_archive_messages (archive_id, role, text, created_at) VALUES ($1, $2, $3, $4)",
+                archive_id, m["role"], m["text"], m["created_at"]
+            )
         
         # Clear current messages
-        await db.chat_messages.delete_many({"user_id": current_user["id"]})
+        await execute("DELETE FROM chat_messages WHERE user_id = $1::uuid", current_user["id"])
         
         return {
             "message": "Chat archived successfully",
             "archived_messages": len(messages),
-            "archive_id": str(archive["_id"])
+            "archive_id": str(archive_id)
         }
     
     return {"message": "No messages to archive"}
@@ -1134,16 +1131,22 @@ async def archive_chat_session(current_user: dict = Depends(get_current_user)):
 @api_router.get("/chat/archives")
 async def get_chat_archives(current_user: dict = Depends(get_current_user)):
     """Get list of archived chat sessions"""
-    archives = await db.chat_archives.find({"user_id": current_user["id"]}).sort("archived_at", -1).to_list(100)
+    archives = await fetch(
+        "SELECT * FROM chat_archives WHERE user_id = $1::uuid ORDER BY archived_at DESC",
+        current_user["id"]
+    )
     
     result = []
     for archive in archives:
         # Get first user message as preview
-        first_message = next((m for m in archive["messages"] if m["role"] == "user"), None)
-        preview = first_message["text"][:50] + "..." if first_message else "Empty chat"
+        first_message = await fetchrow(
+            "SELECT text FROM chat_archive_messages WHERE archive_id = $1 AND role = 'user' ORDER BY created_at ASC LIMIT 1",
+            archive["id"]
+        )
+        preview = (first_message["text"][:50] + "...") if first_message else "Empty chat"
         
         result.append({
-            "id": str(archive["_id"]),
+            "id": str(archive["id"]),
             "archived_at": archive["archived_at"].isoformat(),
             "message_count": archive["message_count"],
             "preview": preview
@@ -1154,31 +1157,36 @@ async def get_chat_archives(current_user: dict = Depends(get_current_user)):
 @api_router.get("/chat/archives/{archive_id}")
 async def get_archived_chat(archive_id: str, current_user: dict = Depends(get_current_user)):
     """Get specific archived chat"""
-    archive = await db.chat_archives.find_one({
-        "_id": ObjectId(archive_id),
-        "user_id": current_user["id"]
-    })
+    validate_uuid(archive_id, "Archive not found")
+    archive = await fetchrow(
+        "SELECT * FROM chat_archives WHERE id = $1::uuid AND user_id = $2::uuid",
+        archive_id, current_user["id"]
+    )
     
     if not archive:
         raise HTTPException(status_code=404, detail="Archive not found")
     
-    messages = [serialize_mongo_doc(m) for m in archive["messages"]]
+    messages = await fetch(
+        "SELECT * FROM chat_archive_messages WHERE archive_id = $1::uuid ORDER BY created_at ASC",
+        archive_id
+    )
     
     return {
-        "archive_id": str(archive["_id"]),
+        "archive_id": str(archive["id"]),
         "archived_at": archive["archived_at"].isoformat(),
-        "messages": messages
+        "messages": [row_to_dict(m) for m in messages]
     }
 
 @api_router.delete("/chat/archives/{archive_id}")
 async def delete_archived_chat(archive_id: str, current_user: dict = Depends(get_current_user)):
     """Delete archived chat"""
-    result = await db.chat_archives.delete_one({
-        "_id": ObjectId(archive_id),
-        "user_id": current_user["id"]
-    })
+    validate_uuid(archive_id, "Archive not found")
+    result = await execute(
+        "DELETE FROM chat_archives WHERE id = $1::uuid AND user_id = $2::uuid",
+        archive_id, current_user["id"]
+    )
     
-    if result.deleted_count == 0:
+    if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Archive not found")
     
     return {"message": "Archive deleted successfully"}
@@ -1187,7 +1195,7 @@ async def delete_archived_chat(archive_id: str, current_user: dict = Depends(get
 
 @api_router.get("/analytics/summary")
 async def get_analytics_summary(current_user: dict = Depends(get_current_user)):
-    transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
+    transactions = await fetch("SELECT * FROM transactions WHERE user_id = $1::uuid", current_user["id"])
     
     total_income = sum(t["amount"] for t in transactions if t["type"] == "income")
     total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense")
@@ -1236,7 +1244,7 @@ async def get_analytics_summary(current_user: dict = Depends(get_current_user)):
 async def get_ai_insights(current_user: dict = Depends(get_current_user)):
     """Generate AI-powered insights about user's finances"""
     try:
-        transactions = await db.transactions.find({"user_id": current_user["id"]}).to_list(1000)
+        transactions = await fetch("SELECT * FROM transactions WHERE user_id = $1::uuid", current_user["id"])
         
         if len(transactions) == 0:
             return {
@@ -1303,7 +1311,7 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
 
 @api_router.put("/profile/preferences")
 async def update_preferences(preferences: UserPreferences, current_user: dict = Depends(get_current_user)):
-    update_data = {}
+    converted = False
     
     # Handle currency change with conversion
     if preferences.currency:
@@ -1313,28 +1321,24 @@ async def update_preferences(preferences: UserPreferences, current_user: dict = 
         if old_currency != new_currency:
             # Convert all transactions
             await convert_user_transactions(current_user["id"], old_currency, new_currency)
-            update_data["currency"] = new_currency
+            await execute("UPDATE users SET currency = $1 WHERE id = $2::uuid", new_currency, current_user["id"])
+            converted = True
             logger.info(f"Converted transactions from {old_currency} to {new_currency} for user {current_user['id']}")
     
     if preferences.monthly_budget is not None:
-        update_data["monthly_budget"] = preferences.monthly_budget
+        await execute("UPDATE users SET monthly_budget = $1 WHERE id = $2::uuid", preferences.monthly_budget, current_user["id"])
 
     if preferences.budget_alert_threshold is not None:
-        update_data["budget_alert_threshold"] = max(1, min(100, preferences.budget_alert_threshold))
+        clamped = max(1, min(100, preferences.budget_alert_threshold))
+        await execute("UPDATE users SET budget_alert_threshold = $1 WHERE id = $2::uuid", clamped, current_user["id"])
 
     if preferences.notify_budget_alerts is not None:
-        update_data["notify_budget_alerts"] = preferences.notify_budget_alerts
+        await execute("UPDATE users SET notify_budget_alerts = $1 WHERE id = $2::uuid", preferences.notify_budget_alerts, current_user["id"])
 
     if preferences.notify_ai_insights is not None:
-        update_data["notify_ai_insights"] = preferences.notify_ai_insights
+        await execute("UPDATE users SET notify_ai_insights = $1 WHERE id = $2::uuid", preferences.notify_ai_insights, current_user["id"])
     
-    if update_data:
-        await db.users.update_one(
-            {"_id": ObjectId(current_user["id"])},
-            {"$set": update_data}
-        )
-    
-    return {"message": "Preferences updated successfully", "converted": bool(preferences.currency)}
+    return {"message": "Preferences updated successfully", "converted": converted}
 
 # ============ STRIPE WEBHOOK ============
 
@@ -1342,7 +1346,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET')
 
 async def _sync_subscription_from_stripe_id(stripe_subscription_id: str, status_override: Optional[str] = None):
     """Sync local subscription record status based on a Stripe subscription id."""
-    local_sub = await db.subscriptions.find_one({"stripe_subscription_id": stripe_subscription_id})
+    local_sub = await fetchrow("SELECT * FROM subscriptions WHERE stripe_subscription_id = $1", stripe_subscription_id)
     if not local_sub:
         logger.warning(f"Webhook: no local subscription found for Stripe id {stripe_subscription_id}")
         return
@@ -1364,14 +1368,13 @@ async def _sync_subscription_from_stripe_id(stripe_subscription_id: str, status_
             logger.error(f"Webhook: failed to retrieve Stripe subscription {stripe_subscription_id}: {e}")
             return
 
-    update_fields = {"status": new_status}
     if new_status in ("cancelled", "past_due"):
-        update_fields["end_date"] = datetime.utcnow()
-
-    await db.subscriptions.update_one(
-        {"_id": local_sub["_id"]},
-        {"$set": update_fields}
-    )
+        await execute(
+            "UPDATE subscriptions SET status = $1, end_date = $2 WHERE id = $3",
+            new_status, datetime.utcnow(), local_sub["id"]
+        )
+    else:
+        await execute("UPDATE subscriptions SET status = $1 WHERE id = $2", new_status, local_sub["id"])
     logger.info(f"Webhook: synced subscription {stripe_subscription_id} -> status={new_status}")
 
 @api_router.post("/webhooks/stripe")
@@ -1431,10 +1434,10 @@ async def stripe_webhook(request: Request):
 @api_router.get("/subscription/current")
 async def get_current_subscription(current_user: dict = Depends(get_current_user)):
     """Get user's current subscription plan"""
-    subscription = await db.subscriptions.find_one({
-        "user_id": current_user["id"],
-        "status": "active"
-    })
+    subscription = await fetchrow(
+        "SELECT * FROM subscriptions WHERE user_id = $1::uuid AND status = 'active'",
+        current_user["id"]
+    )
     
     if subscription:
         return {
@@ -1522,10 +1525,10 @@ async def create_subscription(
         amount = prices[plan_type]
         
         # Check if user already has active subscription
-        existing = await db.subscriptions.find_one({
-            "user_id": current_user["id"],
-            "status": "active"
-        })
+        existing = await fetchrow(
+            "SELECT * FROM subscriptions WHERE user_id = $1::uuid AND status = 'active'",
+            current_user["id"]
+        )
         
         if existing:
             # Cancel old Stripe subscription if exists
@@ -1536,9 +1539,9 @@ async def create_subscription(
                     logger.error(f"Failed to cancel old subscription: {str(e)}")
             
             # Update old subscription in DB
-            await db.subscriptions.update_one(
-                {"_id": existing["_id"]},
-                {"$set": {"status": "cancelled", "end_date": datetime.utcnow()}}
+            await execute(
+                "UPDATE subscriptions SET status = 'cancelled', end_date = $1 WHERE id = $2",
+                datetime.utcnow(), existing["id"]
             )
         
         # Create Stripe customer if doesn't exist
@@ -1546,7 +1549,7 @@ async def create_subscription(
         user_name = current_user["full_name"]
         
         # Check if customer exists in our DB
-        user_doc = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+        user_doc = await fetchrow("SELECT stripe_customer_id FROM users WHERE id = $1::uuid", current_user["id"])
         stripe_customer_id = user_doc.get("stripe_customer_id")
         
         if not stripe_customer_id:
@@ -1559,10 +1562,7 @@ async def create_subscription(
             stripe_customer_id = customer.id
             
             # Save to DB
-            await db.users.update_one(
-                {"_id": ObjectId(current_user["id"])},
-                {"$set": {"stripe_customer_id": stripe_customer_id}}
-            )
+            await execute("UPDATE users SET stripe_customer_id = $1 WHERE id = $2::uuid", stripe_customer_id, current_user["id"])
         
         # Attach payment method to customer
         try:
@@ -1601,25 +1601,18 @@ async def create_subscription(
             )
             
             # Create subscription record in DB
-            subscription = {
-                "user_id": current_user["id"],
-                "plan_type": plan_type,
-                "status": "active",
-                "start_date": datetime.utcnow(),
-                "end_date": datetime.utcnow() + timedelta(days=30),
-                "stripe_subscription_id": stripe_subscription.id,
-                "stripe_customer_id": stripe_customer_id,
-                "amount": amount,
-                "created_at": datetime.utcnow()
-            }
-            
-            result = await db.subscriptions.insert_one(subscription)
+            sub_row = await fetchrow(
+                """INSERT INTO subscriptions (user_id, plan_type, status, start_date, end_date, stripe_subscription_id, stripe_customer_id, amount)
+                   VALUES ($1::uuid, $2, 'active', $3, $4, $5, $6, $7) RETURNING id""",
+                current_user["id"], plan_type, datetime.utcnow(), datetime.utcnow() + timedelta(days=30),
+                stripe_subscription.id, stripe_customer_id, amount
+            )
             
             logger.info(f"Created real Stripe subscription {stripe_subscription.id} for user {current_user['id']}")
             
             return {
                 "success": True,
-                "subscription_id": str(result.inserted_id),
+                "subscription_id": str(sub_row["id"]),
                 "stripe_subscription_id": stripe_subscription.id,
                 "client_secret": stripe_subscription.latest_invoice.payment_intent.client_secret,
                 "plan_type": plan_type,
@@ -1668,7 +1661,7 @@ async def create_payment_sheet(
         amount = prices[plan_type]
 
         # Get or create Stripe customer
-        user_doc = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+        user_doc = await fetchrow("SELECT stripe_customer_id FROM users WHERE id = $1::uuid", current_user["id"])
         stripe_customer_id = user_doc.get("stripe_customer_id")
 
         if not stripe_customer_id:
@@ -1678,10 +1671,7 @@ async def create_payment_sheet(
                 metadata={"user_id": current_user["id"]}
             )
             stripe_customer_id = customer.id
-            await db.users.update_one(
-                {"_id": ObjectId(current_user["id"])},
-                {"$set": {"stripe_customer_id": stripe_customer_id}}
-            )
+            await execute("UPDATE users SET stripe_customer_id = $1 WHERE id = $2::uuid", stripe_customer_id, current_user["id"])
 
         ephemeral_key = stripe.EphemeralKey.create(
             customer=stripe_customer_id,
@@ -1689,19 +1679,19 @@ async def create_payment_sheet(
         )
 
         # Cancel any existing active subscription before starting a new one
-        existing = await db.subscriptions.find_one({
-            "user_id": current_user["id"],
-            "status": "active"
-        })
+        existing = await fetchrow(
+            "SELECT * FROM subscriptions WHERE user_id = $1::uuid AND status = 'active'",
+            current_user["id"]
+        )
         if existing and existing.get("stripe_subscription_id") and not existing["stripe_subscription_id"].startswith("sub_mock"):
             try:
                 stripe.Subscription.cancel(existing["stripe_subscription_id"])
             except Exception as e:
                 logger.error(f"Failed to cancel old subscription: {str(e)}")
         if existing:
-            await db.subscriptions.update_one(
-                {"_id": existing["_id"]},
-                {"$set": {"status": "cancelled", "end_date": datetime.utcnow()}}
+            await execute(
+                "UPDATE subscriptions SET status = 'cancelled', end_date = $1 WHERE id = $2",
+                datetime.utcnow(), existing["id"]
             )
 
         stripe_subscription = stripe.Subscription.create(
@@ -1727,25 +1717,19 @@ async def create_payment_sheet(
 
         # Record a pending subscription; it is only marked active once the client
         # confirms the PaymentIntent succeeded via /subscription/confirm-payment
-        pending = {
-            "user_id": current_user["id"],
-            "plan_type": plan_type,
-            "status": "pending",
-            "start_date": datetime.utcnow(),
-            "end_date": datetime.utcnow() + timedelta(days=30),
-            "stripe_subscription_id": stripe_subscription.id,
-            "stripe_customer_id": stripe_customer_id,
-            "amount": amount,
-            "created_at": datetime.utcnow()
-        }
-        result = await db.subscriptions.insert_one(pending)
+        pending_row = await fetchrow(
+            """INSERT INTO subscriptions (user_id, plan_type, status, start_date, end_date, stripe_subscription_id, stripe_customer_id, amount)
+               VALUES ($1::uuid, $2, 'pending', $3, $4, $5, $6, $7) RETURNING id""",
+            current_user["id"], plan_type, datetime.utcnow(), datetime.utcnow() + timedelta(days=30),
+            stripe_subscription.id, stripe_customer_id, amount
+        )
 
         return {
             "payment_intent_client_secret": stripe_subscription.latest_invoice.payment_intent.client_secret,
             "ephemeral_key": ephemeral_key.secret,
             "customer_id": stripe_customer_id,
             "publishable_key": credentials.get("publishable"),
-            "subscription_id": str(result.inserted_id),
+            "subscription_id": str(pending_row["id"]),
             "plan_type": plan_type,
             "amount": amount,
         }
@@ -1767,10 +1751,11 @@ async def confirm_payment(
     current_user: dict = Depends(get_current_user)
 ):
     """Mark a pending mobile subscription as active after the PaymentSheet succeeds"""
-    subscription = await db.subscriptions.find_one({
-        "_id": ObjectId(request.subscription_id),
-        "user_id": current_user["id"]
-    })
+    validate_uuid(request.subscription_id, "Subscription not found")
+    subscription = await fetchrow(
+        "SELECT * FROM subscriptions WHERE id = $1::uuid AND user_id = $2::uuid",
+        request.subscription_id, current_user["id"]
+    )
     if not subscription:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
@@ -1782,10 +1767,7 @@ async def confirm_payment(
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=f"Could not verify payment: {str(e)}")
 
-    await db.subscriptions.update_one(
-        {"_id": subscription["_id"]},
-        {"$set": {"status": "active"}}
-    )
+    await execute("UPDATE subscriptions SET status = 'active' WHERE id = $1", subscription["id"])
 
     return {
         "success": True,
@@ -1817,7 +1799,7 @@ async def create_checkout_session(
             raise HTTPException(status_code=400, detail="Invalid plan type")
         
         # Get or create Stripe customer
-        user_doc = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+        user_doc = await fetchrow("SELECT stripe_customer_id FROM users WHERE id = $1::uuid", current_user["id"])
         stripe_customer_id = user_doc.get("stripe_customer_id")
         
         if not stripe_customer_id:
@@ -1827,10 +1809,7 @@ async def create_checkout_session(
                 metadata={"user_id": current_user["id"]}
             )
             stripe_customer_id = customer.id
-            await db.users.update_one(
-                {"_id": ObjectId(current_user["id"])},
-                {"$set": {"stripe_customer_id": stripe_customer_id}}
-            )
+            await execute("UPDATE users SET stripe_customer_id = $1 WHERE id = $2::uuid", stripe_customer_id, current_user["id"])
         
         # Create price in Stripe (or use existing price IDs)
         prices = {"starter": 300, "pro": 900}  # in cents
@@ -1887,10 +1866,10 @@ async def create_checkout_session(
 @api_router.post("/subscription/cancel")
 async def cancel_subscription(current_user: dict = Depends(get_current_user)):
     """Cancel current subscription with real Stripe"""
-    subscription = await db.subscriptions.find_one({
-        "user_id": current_user["id"],
-        "status": "active"
-    })
+    subscription = await fetchrow(
+        "SELECT * FROM subscriptions WHERE user_id = $1::uuid AND status = 'active'",
+        current_user["id"]
+    )
     
     if not subscription:
         raise HTTPException(status_code=404, detail="No active subscription found")
@@ -1906,9 +1885,9 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=500, detail="Failed to cancel subscription in Stripe")
     
     # Update in database
-    await db.subscriptions.update_one(
-        {"_id": subscription["_id"]},
-        {"$set": {"status": "cancelled", "end_date": datetime.utcnow()}}
+    await execute(
+        "UPDATE subscriptions SET status = 'cancelled', end_date = $1 WHERE id = $2",
+        datetime.utcnow(), subscription["id"]
     )
     
     return {"message": "Subscription cancelled successfully"}
@@ -2045,21 +2024,21 @@ async def list_promo_codes():
 @api_router.get("/subscription/usage")
 async def get_subscription_usage(current_user: dict = Depends(get_current_user)):
     """Get current usage stats"""
-    subscription = await db.subscriptions.find_one({
-        "user_id": current_user["id"],
-        "status": "active"
-    })
+    subscription = await fetchrow(
+        "SELECT plan_type FROM subscriptions WHERE user_id = $1::uuid AND status = 'active'",
+        current_user["id"]
+    )
     
-    plan_type = subscription.get("plan_type", "free") if subscription else "free"
+    plan_type = subscription["plan_type"] if subscription else "free"
     limits = get_subscription_limits(plan_type)
     
     # Count AI messages today
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    ai_messages_today = await db.chat_messages.count_documents({
-        "user_id": current_user["id"],
-        "role": "user",
-        "created_at": {"$gte": today_start}
-    })
+    count_row = await fetchrow(
+        "SELECT COUNT(*) as cnt FROM chat_messages WHERE user_id = $1::uuid AND role = 'user' AND created_at >= $2",
+        current_user["id"], today_start
+    )
+    ai_messages_today = count_row["cnt"] if count_row else 0
     
     return {
         "plan_type": plan_type,
@@ -2078,7 +2057,8 @@ async def root():
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "monexa-api"}
+    db_status = "connected" if db_pool else "disconnected"
+    return {"status": "healthy", "service": "monexa-api", "database": db_status}
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -2091,7 +2071,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_db_client():
+    global db_pool
+    if DATABASE_URL:
+        try:
+            db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
+            logger.info("Connected to PostgreSQL database")
+        except Exception as e:
+            logger.error(f"Failed to connect to PostgreSQL database: {e}")
+            db_pool = None
+    else:
+        logger.warning("DATABASE_URL not set. Database features will not work.")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    if client:
-        client.close()
+    global db_pool
+    if db_pool:
+        await db_pool.close()

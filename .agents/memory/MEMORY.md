@@ -1,2 +1,3 @@
 - [DESIGN subagent verification gap](design-subagent-verification.md) — subagents can report success/screenshot-verified yet still leave syntax errors; always refresh_all_logs after a batch.
 - [Expo web bundling of native-only packages](expo-native-web-bundling.md) — runtime `Platform.OS` checks don't stop Metro from resolving native-only packages into web bundles; use `.native.ts`/`.web.ts` file splits instead.
+- [Python pip install on NixOS Replit](python-pip-nixos-install.md) — uv/pip fail with "immutable /nix/store" even when `.pythonlibs` (PYTHONUSERBASE) is the real target; fix is `pip install --user --break-system-packages`.
