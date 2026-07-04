@@ -2,11 +2,17 @@
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/monexa-rebrand/AddTransaction.tsx": () => import("../components/mockups/monexa-rebrand/AddTransaction.tsx"),
+  "./components/mockups/monexa-rebrand/Budget.tsx": () => import("../components/mockups/monexa-rebrand/Budget.tsx"),
+  "./components/mockups/monexa-rebrand/Categories.tsx": () => import("../components/mockups/monexa-rebrand/Categories.tsx"),
   "./components/mockups/monexa-rebrand/Chat.tsx": () => import("../components/mockups/monexa-rebrand/Chat.tsx"),
   "./components/mockups/monexa-rebrand/Home.tsx": () => import("../components/mockups/monexa-rebrand/Home.tsx"),
   "./components/mockups/monexa-rebrand/Insights.tsx": () => import("../components/mockups/monexa-rebrand/Insights.tsx"),
   "./components/mockups/monexa-rebrand/Login.tsx": () => import("../components/mockups/monexa-rebrand/Login.tsx"),
   "./components/mockups/monexa-rebrand/Onboarding.tsx": () => import("../components/mockups/monexa-rebrand/Onboarding.tsx"),
+  "./components/mockups/monexa-rebrand/Preferences.tsx": () => import("../components/mockups/monexa-rebrand/Preferences.tsx"),
+  "./components/mockups/monexa-rebrand/Profile.tsx": () => import("../components/mockups/monexa-rebrand/Profile.tsx"),
+  "./components/mockups/monexa-rebrand/Signup.tsx": () => import("../components/mockups/monexa-rebrand/Signup.tsx"),
   "./components/mockups/monexa-rebrand/Splash.tsx": () => import("../components/mockups/monexa-rebrand/Splash.tsx"),
+  "./components/mockups/monexa-rebrand/Transactions.tsx": () => import("../components/mockups/monexa-rebrand/Transactions.tsx"),
   "./components/mockups/monexa-rebrand/Upgrade.tsx": () => import("../components/mockups/monexa-rebrand/Upgrade.tsx")
 };

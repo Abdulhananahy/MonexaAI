@@ -1,0 +1,1 @@
+- [DESIGN subagent verification gap](design-subagent-verification.md) — subagents can report success/screenshot-verified yet still leave syntax errors; always refresh_all_logs after a batch.
