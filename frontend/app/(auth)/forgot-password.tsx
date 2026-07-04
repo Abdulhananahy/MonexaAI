@@ -11,10 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
-import Constants from 'expo-constants';
-
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
+import api from '../../utils/api';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -29,9 +26,9 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/api/auth/forgot-password`, { email });
+      await api.post('/auth/forgot-password', { email });
       Alert.alert(
-        'Success',
+        'Check your email',
         'If an account exists with this email, a password reset link has been sent.',
         [
           {

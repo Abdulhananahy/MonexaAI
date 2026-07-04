@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, Linking, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
+import { useStripeNative } from '../utils/stripeNative';
 
 export default function UpgradeScreen() {
   const router = useRouter();
   const isWeb = Platform.OS === 'web';
+  const { initPaymentSheet, presentPaymentSheet } = useStripeNative();
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'pro'>('pro');
   const [loading, setLoading] = useState(false);
   const [publishableKey, setPublishableKey] = useState('');
@@ -106,30 +108,53 @@ export default function UpgradeScreen() {
     }
   };
 
-  const handleMobilePayment = () => {
-    Alert.alert(
-      'Mobile Payment',
-      'Stripe payment integration for React Native requires the Stripe SDK which is native-only. For now, please use the web version to subscribe, or contact support.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Contact Support',
-          onPress: () => {
-            const email = 'support@monexa.app';
-            const subject = 'Mobile Subscription Help';
-            const body = `I would like to subscribe to the ${selectedPlan} plan from the mobile app.`;
-            Linking.openURL(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-          },
-        },
-      ]
-    );
+  const handleMobilePayment = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.post('/subscription/create-payment-sheet', {
+        plan_type: selectedPlan,
+      });
+
+      const { error: initError } = await initPaymentSheet({
+        merchantDisplayName: 'Monexa',
+        customerId: data.customer_id,
+        customerEphemeralKeySecret: data.ephemeral_key,
+        paymentIntentClientSecret: data.payment_intent_client_secret,
+        allowsDelayedPaymentMethods: false,
+      });
+
+      if (initError) {
+        Alert.alert('Error', initError.message || 'Failed to set up payment');
+        return;
+      }
+
+      const { error: presentError } = await presentPaymentSheet();
+
+      if (presentError) {
+        if (presentError.code !== 'Canceled') {
+          Alert.alert('Payment Failed', presentError.message || 'Please try again');
+        }
+        return;
+      }
+
+      await api.post('/subscription/confirm-payment', {
+        subscription_id: data.subscription_id,
+      });
+
+      router.replace('/payment-success' as any);
+    } catch (error: any) {
+      console.error('Mobile payment error:', error);
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to process payment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubscribe = async () => {
     if (isWeb) {
       await handleWebCheckout();
     } else {
-      handleMobilePayment();
+      await handleMobilePayment();
     }
   };
 
@@ -229,15 +254,6 @@ export default function UpgradeScreen() {
             </View>
           )}
 
-          {!isWeb && (
-            <View style={styles.webNotice}>
-              <Ionicons name="information-circle" size={24} color="#D32F2F" />
-              <Text style={styles.webNoticeText}>
-                For the best payment experience, please use the web version at monexa.app or contact support to subscribe.
-              </Text>
-            </View>
-          )}
-
           <TouchableOpacity
             style={[styles.subscribeButton, loading && styles.subscribeButtonDisabled]}
             onPress={handleSubscribe}
@@ -248,9 +264,7 @@ export default function UpgradeScreen() {
             ) : (
               <>
                 <Ionicons name="card" size={20} color="#FFFFFF" />
-                <Text style={styles.subscribeButtonText}>
-                  {isWeb ? 'Subscribe Now' : 'Contact Support'}
-                </Text>
+                <Text style={styles.subscribeButtonText}>Subscribe Now</Text>
               </>
             )}
           </TouchableOpacity>

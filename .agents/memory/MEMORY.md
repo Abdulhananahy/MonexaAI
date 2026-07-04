@@ -1,1 +1,2 @@
 - [DESIGN subagent verification gap](design-subagent-verification.md) — subagents can report success/screenshot-verified yet still leave syntax errors; always refresh_all_logs after a batch.
+- [Expo web bundling of native-only packages](expo-native-web-bundling.md) — runtime `Platform.OS` checks don't stop Metro from resolving native-only packages into web bundles; use `.native.ts`/`.web.ts` file splits instead.

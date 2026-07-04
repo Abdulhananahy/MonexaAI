@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 
 export default function PersonalInfoScreen() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const router = useRouter();
   const [fullName, setFullName] = useState(user?.full_name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -34,10 +34,11 @@ export default function PersonalInfoScreen() {
 
     setLoading(true);
     try {
-      // Note: Backend endpoint would need to be created for profile update
+      await api.put('/profile', { full_name: fullName.trim() });
+      await refreshUser();
       Alert.alert('Success', 'Profile updated successfully');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -61,14 +62,17 @@ export default function PersonalInfoScreen() {
 
     setLoading(true);
     try {
-      // Note: Backend endpoint would need to be created for password change
+      await api.post('/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
       Alert.alert('Success', 'Password changed successfully');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setShowPasswordSection(false);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to change password');
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to change password');
     } finally {
       setLoading(false);
     }

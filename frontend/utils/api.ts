@@ -1,14 +1,32 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-const API_URL = 'https://c71a929c-259f-429a-8677-9be12cf992ec-00-11vr14qbni1fh.pike.replit.dev/api';
+// For native (iOS/Android) builds, EXPO_PUBLIC_BACKEND_URL must point at the real
+// production API domain once this app is published. It is baked in at build time,
+// so it must be set before running `eas build`.
+const DEV_FALLBACK_URL = 'https://c71a929c-259f-429a-8677-9be12cf992ec-00-11vr14qbni1fh.pike.replit.dev/api';
 
 const getApiUrl = () => {
   if (Platform.OS === 'web') {
     return '/api';
   }
-  return API_URL;
+
+  const configuredUrl =
+    process.env.EXPO_PUBLIC_BACKEND_URL || Constants.expoConfig?.extra?.backendUrl;
+
+  if (configuredUrl) {
+    return configuredUrl.endsWith('/api') ? configuredUrl : `${configuredUrl}/api`;
+  }
+
+  if (__DEV__) {
+    console.warn(
+      'EXPO_PUBLIC_BACKEND_URL is not set — falling back to the Replit dev domain. ' +
+      'Set EXPO_PUBLIC_BACKEND_URL to your production API URL before building for release.'
+    );
+  }
+  return DEV_FALLBACK_URL;
 };
 
 const api = axios.create({

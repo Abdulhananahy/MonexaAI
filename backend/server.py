@@ -253,6 +253,13 @@ class UserPreferences(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
+class UpdateProfileRequest(BaseModel):
+    full_name: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 class SubscriptionPlan(BaseModel):
     id: Optional[str] = None
     user_id: str
@@ -489,9 +496,53 @@ async def forgot_password(request: ForgotPasswordRequest):
         # Don't reveal if email exists
         return {"message": "If the email exists, a password reset link has been sent"}
     
-    # In a real app, send email with reset token
-    # For MVP, just return success
+    # NOTE: No email provider is currently connected, so no email is actually sent.
+    # Connect an email integration (e.g. SendGrid/Resend) and generate a real reset
+    # token/link here before relying on this in production.
     return {"message": "If the email exists, a password reset link has been sent"}
+
+@api_router.put("/profile")
+async def update_profile(
+    request: UpdateProfileRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update the current user's basic profile information"""
+    full_name = request.full_name.strip()
+    if not full_name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["id"])},
+        {"$set": {"full_name": full_name}}
+    )
+
+    updated_user = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+    return {
+        "id": str(updated_user["_id"]),
+        "full_name": updated_user["full_name"],
+        "email": updated_user["email"],
+        "currency": updated_user.get("currency", "USD"),
+    }
+
+@api_router.post("/auth/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Change the current user's password after verifying the current one"""
+    user_doc = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+    if not user_doc or not verify_password(request.current_password, user_doc["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    new_hash = hash_password(request.new_password)
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["id"])},
+        {"$set": {"password_hash": new_hash}}
+    )
+    return {"message": "Password changed successfully"}
 
 @api_router.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
@@ -1420,6 +1471,154 @@ async def get_stripe_config():
     """Get Stripe publishable key for frontend"""
     credentials = await get_stripe_credentials()
     return {"publishable_key": credentials.get("publishable")}
+
+class CreatePaymentSheetRequest(BaseModel):
+    plan_type: str  # "starter" or "pro"
+
+@api_router.post("/subscription/create-payment-sheet")
+async def create_payment_sheet(
+    request: CreatePaymentSheetRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a Stripe PaymentIntent + ephemeral key for the native mobile PaymentSheet flow"""
+    try:
+        credentials = await get_stripe_credentials()
+        if not credentials.get("secret"):
+            raise HTTPException(status_code=503, detail="Payment system not configured")
+
+        plan_type = request.plan_type
+        if plan_type not in ["starter", "pro"]:
+            raise HTTPException(status_code=400, detail="Invalid plan type")
+
+        prices = {"starter": 3, "pro": 9}
+        amount = prices[plan_type]
+
+        # Get or create Stripe customer
+        user_doc = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+        stripe_customer_id = user_doc.get("stripe_customer_id")
+
+        if not stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=current_user["email"],
+                name=current_user["full_name"],
+                metadata={"user_id": current_user["id"]}
+            )
+            stripe_customer_id = customer.id
+            await db.users.update_one(
+                {"_id": ObjectId(current_user["id"])},
+                {"$set": {"stripe_customer_id": stripe_customer_id}}
+            )
+
+        ephemeral_key = stripe.EphemeralKey.create(
+            customer=stripe_customer_id,
+            stripe_version="2024-06-20"
+        )
+
+        # Cancel any existing active subscription before starting a new one
+        existing = await db.subscriptions.find_one({
+            "user_id": current_user["id"],
+            "status": "active"
+        })
+        if existing and existing.get("stripe_subscription_id") and not existing["stripe_subscription_id"].startswith("sub_mock"):
+            try:
+                stripe.Subscription.cancel(existing["stripe_subscription_id"])
+            except Exception as e:
+                logger.error(f"Failed to cancel old subscription: {str(e)}")
+        if existing:
+            await db.subscriptions.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"status": "cancelled", "end_date": datetime.utcnow()}}
+            )
+
+        stripe_subscription = stripe.Subscription.create(
+            customer=stripe_customer_id,
+            items=[{
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {
+                        "name": f"Monexa {plan_type.title()} Plan",
+                        "description": f"Monthly subscription to Monexa {plan_type.title()}"
+                    },
+                    "recurring": {"interval": "month"},
+                    "unit_amount": amount * 100
+                }
+            }],
+            payment_behavior="default_incomplete",
+            payment_settings={
+                "save_default_payment_method": "on_subscription",
+                "payment_method_types": ["card"],
+            },
+            expand=["latest_invoice.payment_intent"]
+        )
+
+        # Record a pending subscription; it is only marked active once the client
+        # confirms the PaymentIntent succeeded via /subscription/confirm-payment
+        pending = {
+            "user_id": current_user["id"],
+            "plan_type": plan_type,
+            "status": "pending",
+            "start_date": datetime.utcnow(),
+            "end_date": datetime.utcnow() + timedelta(days=30),
+            "stripe_subscription_id": stripe_subscription.id,
+            "stripe_customer_id": stripe_customer_id,
+            "amount": amount,
+            "created_at": datetime.utcnow()
+        }
+        result = await db.subscriptions.insert_one(pending)
+
+        return {
+            "payment_intent_client_secret": stripe_subscription.latest_invoice.payment_intent.client_secret,
+            "ephemeral_key": ephemeral_key.secret,
+            "customer_id": stripe_customer_id,
+            "publishable_key": credentials.get("publishable"),
+            "subscription_id": str(result.inserted_id),
+            "plan_type": plan_type,
+            "amount": amount,
+        }
+    except HTTPException:
+        raise
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating payment sheet: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Payment error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Payment sheet creation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to start payment: {str(e)}")
+
+class ConfirmPaymentRequest(BaseModel):
+    subscription_id: str
+
+@api_router.post("/subscription/confirm-payment")
+async def confirm_payment(
+    request: ConfirmPaymentRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark a pending mobile subscription as active after the PaymentSheet succeeds"""
+    subscription = await db.subscriptions.find_one({
+        "_id": ObjectId(request.subscription_id),
+        "user_id": current_user["id"]
+    })
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    # Verify with Stripe that the subscription is actually active before trusting the client
+    try:
+        stripe_sub = stripe.Subscription.retrieve(subscription["stripe_subscription_id"])
+        if stripe_sub.status not in ["active", "trialing"]:
+            raise HTTPException(status_code=400, detail="Payment has not completed yet")
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=f"Could not verify payment: {str(e)}")
+
+    await db.subscriptions.update_one(
+        {"_id": subscription["_id"]},
+        {"$set": {"status": "active"}}
+    )
+
+    return {
+        "success": True,
+        "plan_type": subscription["plan_type"],
+        "message": f"Successfully subscribed to {subscription['plan_type'].title()} plan!",
+        "limits": get_subscription_limits(subscription["plan_type"])
+    }
 
 class CheckoutSessionRequest(BaseModel):
     plan_type: str

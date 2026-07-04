@@ -264,16 +264,6 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1F2937',
-    backgroundColor: '#FFFFFF',
-  },
   footer: {
     padding: 24,
     borderTopWidth: 1,
