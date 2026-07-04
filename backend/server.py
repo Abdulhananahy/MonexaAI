@@ -1422,23 +1422,22 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
-    event = None
-    if STRIPE_WEBHOOK_SECRET and sig_header:
-        try:
-            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-        except (ValueError, stripe.error.SignatureVerificationError) as e:
-            logger.error(f"Stripe webhook signature verification failed: {e}")
-            raise HTTPException(status_code=400, detail="Invalid webhook signature")
-    else:
-        # No webhook secret configured yet - accept unverified payload so the endpoint
-        # is functional out of the box, but this should be locked down before going live.
-        logger.warning("STRIPE_WEBHOOK_SECRET not set - processing Stripe webhook without signature verification")
-        try:
-            import json
-            event = json.loads(payload)
-        except Exception as e:
-            logger.error(f"Failed to parse Stripe webhook payload: {e}")
-            raise HTTPException(status_code=400, detail="Invalid payload")
+    if not STRIPE_WEBHOOK_SECRET:
+        # Refuse to process unverified payloads. Without a signing secret, anyone who
+        # knows (or guesses) this URL could POST a fake "subscription active" event and
+        # get a free subscription. Set STRIPE_WEBHOOK_SECRET to enable this endpoint.
+        logger.error("Stripe webhook rejected: STRIPE_WEBHOOK_SECRET is not configured")
+        raise HTTPException(status_code=503, detail="Webhook signing secret not configured")
+
+    if not sig_header:
+        logger.error("Stripe webhook rejected: missing stripe-signature header")
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except (ValueError, stripe.error.SignatureVerificationError) as e:
+        logger.error(f"Stripe webhook signature verification failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
     event_type = event.get("type") if isinstance(event, dict) else event["type"]
     data_object = event["data"]["object"] if isinstance(event, dict) else event["data"]["object"]
