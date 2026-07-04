@@ -45,19 +45,14 @@ export default function BudgetScreen() {
     try {
       const [profileRes, summaryRes] = await Promise.all([
         api.get('/profile'),
-        api.get('/transactions/summary')
+        api.get('/analytics/summary')
       ]);
       
       if (profileRes.data.monthly_budget) {
         setBudget(profileRes.data.monthly_budget.toString());
       }
       
-      // Calculate spent for current month
-      const currentMonth = summaryRes.data.monthly_stats?.find((s: any) => {
-        const d = new Date();
-        return s.month === `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      });
-      setSpent(currentMonth?.expense || 0);
+      setSpent(summaryRes.data.current_month_expense || 0);
     } catch (error) {
       console.error('Failed to load budget data:', error);
     }
