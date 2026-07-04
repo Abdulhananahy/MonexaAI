@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
 import { useStripeNative } from '../utils/stripeNative';
+import { COLORS, RADIUS, SHADOW, FONTS } from '../constants/theme';
+import { Mascot } from '../components/Mascot';
 
 export default function UpgradeScreen() {
   const router = useRouter();
@@ -30,32 +32,34 @@ export default function UpgradeScreen() {
     }
   };
 
-  const plans = [
+  const tiers = [
     {
       id: 'starter' as const,
       name: 'Starter',
-      price: 3,
+      price: '$3',
+      period: '/mo',
+      description: 'Perfect for everyday budgeters.',
       features: [
-        '50 AI messages per day',
-        'Basic charts (Bar & Pie)',
-        '90 days history',
-        'Budget alerts',
-        'Email support',
+        { text: '50 AI messages per day', included: true },
+        { text: 'Basic transaction tracking', included: true },
+        { text: 'Visual spending charts', included: true },
+        { text: 'Data export', included: false },
       ],
+      popular: false,
     },
     {
       id: 'pro' as const,
       name: 'Pro',
-      price: 9,
-      popular: true,
+      price: '$9',
+      period: '/mo',
+      description: 'For true financial mastery.',
       features: [
-        'Unlimited AI messages',
-        'All chart types',
-        'Unlimited history',
-        'CSV export',
-        'Advanced insights',
-        'Priority support',
+        { text: 'Unlimited AI messages', included: true },
+        { text: 'Advanced transaction tracking', included: true },
+        { text: 'Visual spending charts', included: true },
+        { text: 'Data export (CSV, PDF)', included: true },
       ],
+      popular: true,
     },
   ];
 
@@ -161,120 +165,130 @@ export default function UpgradeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="close" size={24} color="#1F2937" />
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => router.back()}>
+          <Ionicons name="close" size={24} color={COLORS.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Upgrade to Pro</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.headerTitle}>Upgrade</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <Ionicons name="star" size={48} color="#D32F2F" />
-          <Text style={styles.title}>Unlock Premium Features</Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.heroSection}>
+          <Mascot mood="celebrating" size={140} />
+          <Text style={styles.title}>Unlock your full money story ✨</Text>
           <Text style={styles.subtitle}>
-            Get the most out of Monexa with unlimited AI chat, advanced analytics, and more
+            Choose the plan that fits your financial journey.
           </Text>
+        </View>
 
-          <View style={styles.plansContainer}>
-            {plans.map((plan) => (
-              <TouchableOpacity
-                key={plan.id}
-                style={[
-                  styles.planCard,
-                  selectedPlan === plan.id && styles.selectedPlanCard,
-                  plan.popular && styles.popularPlan,
-                ]}
-                onPress={() => setSelectedPlan(plan.id)}
-              >
-                {plan.popular && (
-                  <View style={styles.popularBadge}>
-                    <Text style={styles.popularText}>MOST POPULAR</Text>
-                  </View>
-                )}
-                <View style={styles.planHeader}>
-                  <View style={styles.planNameRow}>
-                    <Text style={styles.planName}>{plan.name}</Text>
-                    {selectedPlan === plan.id && (
-                      <View style={styles.selectedIndicator}>
-                        <Ionicons name="checkmark-circle" size={24} color="#D32F2F" />
+        <View style={styles.tiersContainer}>
+          {tiers.map((tier) => (
+            <TouchableOpacity
+              key={tier.id}
+              style={[
+                styles.tierCard,
+                selectedPlan === tier.id && styles.selectedTierCard,
+                tier.popular && styles.popularTier,
+              ]}
+              onPress={() => setSelectedPlan(tier.id)}
+            >
+              {tier.popular && (
+                <View style={styles.popularBadge}>
+                  <Text style={styles.popularText}>Most Popular</Text>
+                </View>
+              )}
+              <View style={styles.tierHeader}>
+                <View>
+                  <Text style={styles.tierName}>{tier.name}</Text>
+                  <Text style={styles.tierDescription}>{tier.description}</Text>
+                </View>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.price}>{tier.price}</Text>
+                  {tier.period && <Text style={styles.period}>{tier.period}</Text>}
+                </View>
+              </View>
+              <View style={styles.featuresList}>
+                {tier.features.map((feature, idx) => (
+                  <View key={idx} style={styles.featureItem}>
+                    {feature.included ? (
+                      <View style={[styles.featureIcon, styles.featureIconIncluded]}>
+                        <Ionicons name="checkmark" size={12} color={COLORS.income} />
+                      </View>
+                    ) : (
+                      <View style={[styles.featureIcon, styles.featureIconExcluded]}>
+                        <Ionicons name="close" size={12} color={COLORS.expense} />
                       </View>
                     )}
+                    <Text style={[
+                      styles.featureText,
+                      !feature.included && styles.featureTextExcluded
+                    ]}>
+                      {feature.text}
+                    </Text>
                   </View>
-                  <View style={styles.priceContainer}>
-                    <Text style={styles.currency}>$</Text>
-                    <Text style={styles.price}>{plan.price}</Text>
-                    <Text style={styles.period}>/month</Text>
-                  </View>
-                </View>
-                <View style={styles.featuresContainer}>
-                  {plan.features.map((feature, idx) => (
-                    <View key={idx} style={styles.featureItem}>
-                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                      <Text style={styles.featureText}>{feature}</Text>
-                    </View>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {isWeb && (
-            <View style={styles.promoContainer}>
-              <Text style={styles.promoLabel}>Have a promo code?</Text>
-              <View style={styles.promoInputRow}>
-                <TextInput
-                  style={[
-                    styles.promoInput,
-                    promoValid === true && styles.promoInputValid,
-                    promoValid === false && styles.promoInputInvalid,
-                  ]}
-                  placeholder="Enter promo code"
-                  value={promoCode}
-                  onChangeText={(text) => {
-                    setPromoCode(text.toUpperCase());
-                    setPromoValid(null);
-                    setPromoDiscount('');
-                  }}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity style={styles.promoApplyButton} onPress={validatePromoCode}>
-                  <Text style={styles.promoApplyText}>Apply</Text>
-                </TouchableOpacity>
+                ))}
               </View>
-              {promoValid === true && (
-                <View style={styles.promoSuccess}>
-                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                  <Text style={styles.promoSuccessText}>{promoDiscount} applied!</Text>
-                </View>
-              )}
-              {promoValid === false && (
-                <Text style={styles.promoError}>Invalid or expired promo code</Text>
-              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.promoSection}>
+          <View style={styles.promoInputRow}>
+            <View style={styles.promoIconContainer}>
+              <Ionicons name="pricetag-outline" size={18} color={COLORS.inkSoft} />
+            </View>
+            <TextInput
+              style={[
+                styles.promoInput,
+                promoValid === true && styles.promoInputValid,
+                promoValid === false && styles.promoInputInvalid,
+              ]}
+              placeholder="Have a promo code?"
+              placeholderTextColor={COLORS.inkSoft}
+              value={promoCode}
+              onChangeText={(text) => {
+                setPromoCode(text.toUpperCase());
+                setPromoValid(null);
+                setPromoDiscount('');
+              }}
+              autoCapitalize="characters"
+            />
+            <TouchableOpacity style={styles.promoApplyButton} onPress={validatePromoCode}>
+              <Text style={styles.promoApplyText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+          {promoValid === true && (
+            <View style={styles.promoSuccess}>
+              <Ionicons name="checkmark-circle" size={16} color={COLORS.income} />
+              <Text style={styles.promoSuccessText}>{promoDiscount} applied!</Text>
             </View>
           )}
+          {promoValid === false && (
+            <Text style={styles.promoError}>Invalid or expired promo code</Text>
+          )}
+        </View>
 
-          <TouchableOpacity
-            style={[styles.subscribeButton, loading && styles.subscribeButtonDisabled]}
-            onPress={handleSubscribe}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="card" size={20} color="#FFFFFF" />
-                <Text style={styles.subscribeButtonText}>Subscribe Now</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.securityBadge}>
-            <Ionicons name="shield-checkmark" size={20} color="#10B981" />
-            <Text style={styles.securityText}>
-              Secured by Stripe • Cancel anytime • No hidden fees
+        <TouchableOpacity
+          style={[styles.subscribeButton, loading && styles.subscribeButtonDisabled]}
+          onPress={handleSubscribe}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Text style={styles.subscribeButtonText}>
+              Continue with {tiers.find(t => t.id === selectedPlan)?.name}
             </Text>
-          </View>
+          )}
+        </TouchableOpacity>
+
+        <Text style={styles.footerText}>
+          Cancel anytime. Terms and conditions apply.
+        </Text>
+        
+        <View style={styles.securityBadge}>
+          <Ionicons name="shield-checkmark" size={16} color={COLORS.income} />
+          <Text style={styles.securityText}>Secured by Stripe</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -284,112 +298,127 @@ export default function UpgradeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bg,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.bgElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOW.soft,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 20,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
   },
   scrollView: {
     flex: 1,
   },
-  content: {
+  scrollContent: {
     padding: 24,
+    paddingBottom: 40,
+  },
+  heroSection: {
     alignItems: 'center',
+    marginBottom: 32,
   },
   title: {
     fontSize: 28,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 16,
+    fontFamily: FONTS.displayExtra,
+    color: COLORS.ink,
     textAlign: 'center',
+    marginTop: 20,
+    lineHeight: 34,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 15,
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
     textAlign: 'center',
     marginTop: 8,
+  },
+  tiersContainer: {
+    gap: 16,
     marginBottom: 32,
   },
-  plansContainer: {
-    width: '100%',
-    gap: 16,
-  },
-  planCard: {
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
+  tierCard: {
+    backgroundColor: COLORS.bgElevated,
+    borderRadius: RADIUS.card,
     padding: 24,
-    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    position: 'relative',
+    overflow: 'hidden',
+    ...SHADOW.soft,
   },
-  selectedPlanCard: {
-    borderColor: '#D32F2F',
-    backgroundColor: '#FEF2F2',
+  selectedTierCard: {
+    borderColor: COLORS.primary,
+    transform: [{ scale: 1.02 }],
+    ...SHADOW.card,
   },
-  popularPlan: {
-    borderColor: '#D32F2F',
+  popularTier: {
+    borderColor: COLORS.gold,
   },
   popularBadge: {
     position: 'absolute',
-    top: -12,
-    right: 24,
-    backgroundColor: '#D32F2F',
+    top: 0,
+    right: 0,
+    backgroundColor: COLORS.gold,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderBottomLeftRadius: 12,
   },
   popularText: {
-    color: '#FFFFFF',
+    color: COLORS.ink,
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: FONTS.bodyBold,
+    textTransform: 'uppercase',
   },
-  planHeader: {
-    marginBottom: 24,
-  },
-  planNameRow: {
+  tierHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  planName: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
+  tierName: {
+    fontSize: 22,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
   },
-  selectedIndicator: {
-    marginLeft: 8,
+  tierDescription: {
+    fontSize: 13,
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
+    marginTop: 2,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
-  currency: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
   price: {
-    fontSize: 40,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 28,
+    fontFamily: FONTS.displayExtra,
+    color: COLORS.primary,
   },
   period: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginLeft: 4,
+    fontSize: 14,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.inkSoft,
   },
-  featuresContainer: {
+  featuresList: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.bg,
+    paddingTop: 16,
     gap: 12,
   },
   featureItem: {
@@ -397,122 +426,123 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  featureIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  featureIconIncluded: {
+    backgroundColor: COLORS.incomeSoft,
+  },
+  featureIconExcluded: {
+    backgroundColor: COLORS.expenseSoft,
+    opacity: 0.5,
+  },
   featureText: {
     fontSize: 14,
-    color: '#1F2937',
-    flex: 1,
+    fontFamily: FONTS.body,
+    color: COLORS.ink,
   },
-  webNotice: {
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: '#FEF2F2',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 32,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
+  featureTextExcluded: {
+    color: COLORS.inkSoft,
+    textDecorationLine: 'line-through',
+    opacity: 0.75,
   },
-  webNoticeText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1F2937',
-    lineHeight: 20,
-  },
-  subscribeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#D32F2F',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    width: '100%',
-    marginTop: 16,
-  },
-  subscribeButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  subscribeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  securityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-    paddingVertical: 12,
-  },
-  securityText: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  promoContainer: {
-    width: '100%',
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  promoLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
-    marginBottom: 8,
+  promoSection: {
+    marginBottom: 24,
   },
   promoInputRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    backgroundColor: COLORS.bgElevated,
+    borderRadius: 16,
+    padding: 4,
+    ...SHADOW.soft,
+  },
+  promoIconContainer: {
+    paddingLeft: 12,
+    paddingRight: 8,
   },
   promoInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    height: 48,
     fontSize: 14,
-    backgroundColor: '#FFFFFF',
+    fontFamily: FONTS.body,
+    color: COLORS.ink,
   },
   promoInputValid: {
-    borderColor: '#10B981',
-    backgroundColor: '#F0FDF4',
+    borderColor: COLORS.income,
+    backgroundColor: COLORS.incomeSoft,
   },
   promoInputInvalid: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
+    borderColor: COLORS.expense,
+    backgroundColor: COLORS.expenseSoft,
   },
   promoApplyButton: {
-    backgroundColor: '#6B7280',
+    backgroundColor: COLORS.primarySoft,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 8,
-    justifyContent: 'center',
+    borderRadius: 12,
   },
   promoApplyText: {
-    color: '#FFFFFF',
+    color: COLORS.primaryDark,
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: FONTS.bodyBold,
   },
   promoSuccess: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 8,
+    paddingLeft: 4,
   },
   promoSuccessText: {
     fontSize: 13,
-    color: '#10B981',
-    fontWeight: '500',
+    fontFamily: FONTS.bodySemi,
+    color: COLORS.income,
   },
   promoError: {
     fontSize: 13,
-    color: '#EF4444',
+    fontFamily: FONTS.body,
+    color: COLORS.expense,
     marginTop: 8,
+    paddingLeft: 4,
+  },
+  subscribeButton: {
+    backgroundColor: COLORS.primary,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOW.card,
+  },
+  subscribeButtonDisabled: {
+    opacity: 0.6,
+  },
+  subscribeButtonText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontFamily: FONTS.bodyBold,
+  },
+  footerText: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
+    marginTop: 16,
+  },
+  securityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  securityText: {
+    fontSize: 12,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.inkSoft,
   },
 });

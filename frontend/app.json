@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/images/splash-image.png",
       "resizeMode": "contain",
-      "backgroundColor": "#D32F2F"
+      "backgroundColor": "#6C5CE7"
     },
     "ios": {
       "supportsTablet": true,
@@ -22,7 +22,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#D32F2F"
+        "backgroundColor": "#6C5CE7"
       },
       "permissions": ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"],
       "edgeToEdgeEnabled": false

@@ -86,6 +86,7 @@ Use the Expo Go app to scan the QR code from the terminal to test on mobile devi
 - Fixed promo code validation to accept Query parameters matching frontend usage
 - Switched AI from OpenAI to Google Gemini using Replit AI Integrations (no external API key required, billed to Replit credits)
 - Migrated entire backend from MongoDB to Replit-managed PostgreSQL after the external MongoDB Atlas cluster went permanently unreachable (DNS NXDOMAIN). Rewrote all data access in `server.py` to use `asyncpg` with UUID primary keys; schema covers users, transactions, categories, chat_messages, chat_archives/chat_archive_messages, and subscriptions. Removed motor/pymongo/dnspython dependencies.
+- Rebranded the entire app to the "Monexa rebrand" visual identity designed in the mockup sandbox: indigo/purple (#6C5CE7) + gold (#FFC94D) palette on a warm cream background, "Baloo 2" display font + "Inter" body font, and "Momo" the owl mascot (SVG, ported to React Native at `frontend/components/Mascot.tsx`) used across all screens. Shared design tokens live in `frontend/constants/theme.ts` (COLORS, RADIUS, SHADOW, FONTS). All 14 screens (splash, onboarding, login, signup, home, add-transaction, transactions, chat, insights, upgrade, budget, categories, profile, preferences) were restyled to match while preserving all existing functionality (API calls, auth, Stripe checkout, navigation). Tab bar restyled with a raised circular "Add" button in the center matching the mockup's bottom nav.
 
 ## Subscription Tiers
 - **Free**: 10 AI messages/day, no charts, no export

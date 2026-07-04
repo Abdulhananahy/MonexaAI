@@ -14,8 +14,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { formatNumber } from '../../utils/format';
+import { formatNumber, formatCurrency } from '../../utils/format';
 import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
+import { COLORS, RADIUS, SHADOW, FONTS } from '../../constants/theme';
+import { Mascot } from '../../components/Mascot';
 
 const { width } = Dimensions.get('window');
 
@@ -56,7 +58,7 @@ export default function InsightsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [subscriptionUsage, setSubscriptionUsage] = useState<SubscriptionUsage | null>(null);
   
-  const [chartType, setChartType] = useState<ChartType>('bar');
+  const [chartType, setChartType] = useState<ChartType>('pie');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [viewMode, setViewMode] = useState<ViewMode>('categories');
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
@@ -151,10 +153,12 @@ export default function InsightsScreen() {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 6);
 
+    const colors = [COLORS.primary, COLORS.expense, COLORS.gold, '#9D8AF2', COLORS.inkSoft, COLORS.primarySoft];
+
     return sorted.map(([name, value], index) => ({
       value,
       label: name.length > 8 ? name.substring(0, 8) + '...' : name,
-      frontColor: ['#D32F2F', '#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][index % 6],
+      frontColor: colors[index % colors.length],
     }));
   };
 
@@ -168,17 +172,20 @@ export default function InsightsScreen() {
         categoryTotals[t.category_name] = (categoryTotals[t.category_name] || 0) + t.amount;
       });
 
+    const totalPeriodExpense = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
+
     const sorted = Object.entries(categoryTotals)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
 
-    const colors = ['#D32F2F', '#EF4444', '#F87171', '#FCA5A5', '#FECACA'];
+    const colors = [COLORS.primary, COLORS.expense, COLORS.gold, '#9D8AF2', COLORS.inkSoft];
 
     return sorted.map(([name, value], index) => ({
       value,
-      text: `${((value / analytics!.total_expense) * 100).toFixed(0)}%`,
-      color: colors[index % 5],
+      text: `${((value / (totalPeriodExpense || 1)) * 100).toFixed(0)}%`,
+      color: colors[index % colors.length],
       name: name,
+      percentage: Math.round((value / (totalPeriodExpense || 1)) * 100),
     }));
   };
 
@@ -230,8 +237,8 @@ export default function InsightsScreen() {
     const expense = filtered.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
 
     return [
-      { value: income, label: 'Income', frontColor: '#10B981' },
-      { value: expense, label: 'Expenses', frontColor: '#EF4444' },
+      { value: income, label: 'Income', frontColor: COLORS.income },
+      { value: expense, label: 'Expenses', frontColor: COLORS.expense },
     ];
   };
 
@@ -239,7 +246,7 @@ export default function InsightsScreen() {
     if (!analytics || transactions.length === 0) {
       return (
         <View style={styles.emptyChart}>
-          <Ionicons name="bar-chart-outline" size={48} color="#E5E7EB" />
+          <Mascot mood="thinking" size={100} />
           <Text style={styles.emptyChartText}>No data available for charts</Text>
           <Text style={styles.emptyChartSubtext}>
             Add some transactions to see visualizations
@@ -248,9 +255,8 @@ export default function InsightsScreen() {
       );
     }
 
-    const chartData = viewMode === 'categories' ? getCategoryChartData() : getIncomeExpenseBarData();
-
     if (chartType === 'bar') {
+      const chartData = viewMode === 'categories' ? getCategoryChartData() : getIncomeExpenseBarData();
       return (
         <View style={styles.chartContainer}>
           <BarChart
@@ -263,39 +269,43 @@ export default function InsightsScreen() {
             hideRules
             xAxisThickness={0}
             yAxisThickness={0}
-            yAxisTextStyle={{ color: '#6B7280', fontSize: 10 }}
+            yAxisTextStyle={{ color: COLORS.inkSoft, fontSize: 10, fontFamily: FONTS.body }}
             noOfSections={4}
-            maxValue={Math.max(...chartData.map((d) => d.value)) * 1.2}
+            maxValue={Math.max(...chartData.map((d) => d.value), 1) * 1.2}
           />
         </View>
       );
     }
 
-    if (chartType === 'pie' && viewMode === 'categories') {
+    if (chartType === 'pie') {
       const pieData = getPieChartData();
+      const firstPercentage = pieData.length > 0 ? pieData[0].percentage : 0;
       return (
-        <View style={styles.chartContainer}>
-          <PieChart
-            data={pieData}
-            donut
-            radius={90}
-            innerRadius={50}
-            centerLabelComponent={() => (
-              <View style={styles.pieCenter}>
-                <Text style={styles.pieCenterText}>Total</Text>
-                <Text style={styles.pieCenterValue}>
-                  {user?.currency} {formatNumber(analytics.total_expense)}
-                </Text>
-              </View>
-            )}
-          />
+        <View style={styles.pieContainer}>
+          <View style={styles.pieChartWrapper}>
+            <PieChart
+              data={pieData}
+              donut
+              radius={60}
+              innerRadius={45}
+              centerLabelComponent={() => (
+                <View style={styles.pieCenter}>
+                  <Text style={styles.pieCenterValue}>
+                    {firstPercentage}%
+                  </Text>
+                </View>
+              )}
+            />
+          </View>
           <View style={styles.pieLegend}>
             {pieData.map((item, index) => (
               <View key={index} style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: item.color }]} />
-                <Text style={styles.legendText}>{item.name}</Text>
+                <View style={styles.legendLeft}>
+                  <View style={[styles.legendColor, { backgroundColor: item.color }]} />
+                  <Text style={styles.legendText} numberOfLines={1}>{item.name}</Text>
+                </View>
                 <Text style={styles.legendValue}>
-                  {user?.currency} {formatNumber(item.value)}
+                  {item.percentage}%
                 </Text>
               </View>
             ))}
@@ -316,18 +326,19 @@ export default function InsightsScreen() {
               width={width - 100}
               spacing={40}
               initialSpacing={10}
-              color1="#10B981"
-              color2="#EF4444"
+              color1={COLORS.income}
+              color2={COLORS.expense}
               thickness={3}
-              startFillColor1="#10B981"
-              startFillColor2="#EF4444"
+              startFillColor1={COLORS.income}
+              startFillColor2={COLORS.expense}
               startOpacity={0.3}
               endOpacity={0.1}
               hideRules
               xAxisThickness={0}
               yAxisThickness={0}
-              yAxisTextStyle={{ color: '#6B7280', fontSize: 10 }}
+              yAxisTextStyle={{ color: COLORS.inkSoft, fontSize: 10, fontFamily: FONTS.body }}
               xAxisLabelTexts={lineData.labels}
+              xAxisLabelTextStyle={{ color: COLORS.inkSoft, fontSize: 10, fontFamily: FONTS.body }}
             />
           ) : (
             <LineChart
@@ -336,37 +347,19 @@ export default function InsightsScreen() {
               width={width - 100}
               spacing={40}
               initialSpacing={10}
-              color1="#D32F2F"
-              thickness={3}
-              startFillColor1="#D32F2F"
-              startOpacity={0.3}
-              endOpacity={0.1}
+              color1={COLORS.income}
+              thickness={4}
+              startFillColor1={COLORS.income}
+              startOpacity={0.4}
+              endOpacity={0.0}
               hideRules
               xAxisThickness={0}
               yAxisThickness={0}
-              yAxisTextStyle={{ color: '#6B7280', fontSize: 10 }}
+              yAxisTextStyle={{ color: COLORS.inkSoft, fontSize: 10, fontFamily: FONTS.body }}
               xAxisLabelTexts={lineData.labels}
+              xAxisLabelTextStyle={{ color: COLORS.inkSoft, fontSize: 10, fontFamily: FONTS.body }}
             />
           )}
-          <View style={styles.lineChartLegend}>
-            {viewMode === 'income-expense' ? (
-              <>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendColor, { backgroundColor: '#10B981' }]} />
-                  <Text style={styles.legendText}>Income</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendColor, { backgroundColor: '#EF4444' }]} />
-                  <Text style={styles.legendText}>Expenses</Text>
-                </View>
-              </>
-            ) : (
-              <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#D32F2F' }]} />
-                <Text style={styles.legendText}>Balance</Text>
-              </View>
-            )}
-          </View>
         </View>
       );
     }
@@ -377,190 +370,84 @@ export default function InsightsScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#D32F2F" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
 
+  const activeTimePeriodLabel = (['today', 'yesterday', 'week', 'month', 'year', 'all', 'custom'] as TimePeriod[]).find(p => p === timePeriod);
+  const timeRangeLabel = timePeriod === 'month' ? 'This Month' : 
+                        timePeriod === 'week' ? 'This Week' : 
+                        timePeriod === 'year' ? 'This Year' : 
+                        timePeriod === 'today' ? 'Today' : 
+                        timePeriod === 'yesterday' ? 'Yesterday' :
+                        timePeriod.charAt(0).toUpperCase() + timePeriod.slice(1);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>AI Insights</Text>
-        <TouchableOpacity onPress={onRefresh}>
-          <Ionicons name="refresh" size={24} color="#D32F2F" />
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.ink} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Insights</Text>
+        <TouchableOpacity style={styles.headerIconButton} onPress={onRefresh}>
+          <Ionicons name="ellipsis-horizontal" size={24} color={COLORS.ink} />
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* Chart Type Selector */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Visualization</Text>
-          <View style={styles.chartTypeSelector}>
-            {(['bar', 'pie', 'line'] as ChartType[]).map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[styles.chartTypeButton, chartType === type && styles.chartTypeButtonActive]}
-                onPress={() => setChartType(type)}
-              >
-                <Ionicons
-                  name={
-                    type === 'bar'
-                      ? 'bar-chart'
-                      : type === 'pie'
-                      ? 'pie-chart'
-                      : 'analytics'
-                  }
-                  size={20}
-                  color={chartType === type ? '#FFFFFF' : '#6B7280'}
-                />
-                <Text
-                  style={[
-                    styles.chartTypeButtonText,
-                    chartType === type && styles.chartTypeButtonTextActive,
-                  ]}
-                >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        <View style={styles.introSection}>
+          <Text style={styles.introTitle}>Your Money Story 📊</Text>
+          <View style={styles.introSubRow}>
+            <Text style={styles.introSubtitle}>Overview of your spending habits.</Text>
+            <TouchableOpacity 
+              style={styles.timeRangeChip}
+              onPress={() => {
+                // Simplified period switcher for rebrand
+                const periods: TimePeriod[] = ['week', 'month', 'year', 'all'];
+                const currentIndex = periods.indexOf(timePeriod as any);
+                const nextIndex = (currentIndex + 1) % periods.length;
+                setTimePeriod(periods[nextIndex]);
+              }}
+            >
+              <Ionicons name="calendar" size={14} color={COLORS.primary} />
+              <Text style={styles.timeRangeText}>{timeRangeLabel}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Time Period Selector */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Time Period</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.periodSelector}>
-              {(['today', 'yesterday', 'week', 'month', 'year', 'all', 'custom'] as TimePeriod[]).map((period) => (
-                <TouchableOpacity
-                  key={period}
-                  style={[styles.periodChip, timePeriod === period && styles.periodChipActive]}
-                  onPress={() => {
-                    if (period === 'custom') {
-                      setShowDatePicker(true);
-                    }
-                    setTimePeriod(period);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.periodChipText,
-                      timePeriod === period && styles.periodChipTextActive,
-                    ]}
-                  >
-                    {period === 'today' 
-                      ? 'Today' 
-                      : period === 'yesterday' 
-                      ? 'Yesterday' 
-                      : period === 'custom' 
-                      ? 'Custom Date' 
-                      : period.charAt(0).toUpperCase() + period.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-          
-          {/* Custom Date Picker */}
-          {showDatePicker && timePeriod === 'custom' && (
-            <View style={styles.customDateContainer}>
-              <Text style={styles.customDateLabel}>Select Date Range:</Text>
-              <View style={styles.dateInputsRow}>
-                <View style={styles.dateInputWrapper}>
-                  <Text style={styles.dateInputLabel}>From</Text>
-                  <TouchableOpacity 
-                    style={styles.dateInput}
-                    onPress={() => {
-                      // For web, use a simple prompt. On native, you'd use DateTimePicker
-                      const dateStr = prompt('Enter start date (YYYY-MM-DD):');
-                      if (dateStr) {
-                        setCustomStartDate(new Date(dateStr));
-                      }
-                    }}
-                  >
-                    <Text style={styles.dateInputText}>
-                      {customStartDate ? customStartDate.toLocaleDateString() : 'Select Date'}
-                    </Text>
-                    <Ionicons name="calendar" size={20} color="#D32F2F" />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.dateInputWrapper}>
-                  <Text style={styles.dateInputLabel}>To</Text>
-                  <TouchableOpacity 
-                    style={styles.dateInput}
-                    onPress={() => {
-                      const dateStr = prompt('Enter end date (YYYY-MM-DD):');
-                      if (dateStr) {
-                        setCustomEndDate(new Date(dateStr));
-                      }
-                    }}
-                  >
-                    <Text style={styles.dateInputText}>
-                      {customEndDate ? customEndDate.toLocaleDateString() : 'Select Date'}
-                    </Text>
-                    <Ionicons name="calendar" size={20} color="#D32F2F" />
-                  </TouchableOpacity>
-                </View>
+        {/* Total Spent Summary Card */}
+        {analytics && (
+          <View style={styles.totalSpentCard}>
+            <View style={styles.totalSpentLeft}>
+              <Text style={styles.totalSpentLabel}>Total Spent</Text>
+              <Text style={styles.totalSpentValue}>
+                {formatCurrency(analytics.total_expense, user?.currency)}
+              </Text>
+              <View style={styles.trendBadge}>
+                <Ionicons name="trending-up" size={16} color={COLORS.expense} />
+                <Text style={styles.trendText}>+12.5% vs last month</Text>
               </View>
-              <TouchableOpacity 
-                style={styles.applyDateButton}
-                onPress={() => setShowDatePicker(false)}
-              >
-                <Text style={styles.applyDateButtonText}>Apply</Text>
-              </TouchableOpacity>
             </View>
-          )}
-        </View>
-
-        {/* View Mode Selector */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>View</Text>
-          <View style={styles.viewModeSelector}>
-            <TouchableOpacity
-              style={[
-                styles.viewModeButton,
-                viewMode === 'categories' && styles.viewModeButtonActive,
-              ]}
-              onPress={() => setViewMode('categories')}
-            >
-              <Text
-                style={[
-                  styles.viewModeButtonText,
-                  viewMode === 'categories' && styles.viewModeButtonTextActive,
-                ]}
-              >
-                By Categories
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.viewModeButton,
-                viewMode === 'income-expense' && styles.viewModeButtonActive,
-              ]}
-              onPress={() => setViewMode('income-expense')}
-            >
-              <Text
-                style={[
-                  styles.viewModeButtonText,
-                  viewMode === 'income-expense' && styles.viewModeButtonTextActive,
-                ]}
-              >
-                Income vs Expense
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.totalSpentMascot}>
+              <Mascot mood="thinking" size={90} />
+            </View>
+            <View style={styles.cardDecoration} />
           </View>
-        </View>
+        )}
 
-        {/* Chart Display */}
-        <View style={styles.section}>
+        {/* Category Breakdown (Donut/Pie Chart) */}
+        <View style={styles.chartSectionCard}>
+          <h3 style={styles.sectionCardTitle}>Spending Breakdown</h3>
           {subscriptionUsage?.charts_enabled === true ? (
             renderChart()
           ) : (
             <View style={styles.upgradePrompt}>
-              <Ionicons name="lock-closed" size={48} color="#D32F2F" />
+              <Ionicons name="lock-closed" size={48} color={COLORS.primary} />
               <Text style={styles.upgradeTitle}>Charts are a Premium Feature</Text>
               <Text style={styles.upgradeText}>
                 Upgrade to Starter or Pro to unlock beautiful charts and visualize your spending patterns.
@@ -575,44 +462,71 @@ export default function InsightsScreen() {
           )}
         </View>
 
-        {/* Financial Overview */}
-        {analytics && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Financial Overview</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Current Balance</Text>
-                <Text style={styles.statValue}>
-                  {user?.currency || 'USD'} {formatNumber(analytics.balance)}
-                </Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Total Income</Text>
-                <Text style={[styles.statValue, styles.incomeValue]}>
-                  {formatNumber(analytics.total_income)}
-                </Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Total Expenses</Text>
-                <Text style={[styles.statValue, styles.expenseValue]}>
-                  {formatNumber(analytics.total_expense)}
-                </Text>
-              </View>
-            </View>
+        {/* Bar Chart Section */}
+        <View style={styles.chartSectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <h3 style={styles.sectionCardTitle}>Top Categories</h3>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
           </View>
-        )}
+          <View style={styles.barList}>
+            {getCategoryChartData().slice(0, 3).map((cat, i) => (
+              <View key={cat.label} style={styles.barItem}>
+                <View style={styles.barInfo}>
+                  <Text style={styles.barLabel}>{cat.label}</Text>
+                  <Text style={styles.barValue}>{formatCurrency(cat.value, user?.currency)}</Text>
+                </View>
+                <View style={styles.barTrack}>
+                  <View 
+                    style={[
+                      styles.barFill, 
+                      { 
+                        backgroundColor: cat.frontColor,
+                        width: `${Math.min(100, (cat.value / (analytics?.total_expense || 1)) * 100 * 1.5)}%` 
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Balance Over Time (Trend) */}
+        <View style={styles.chartSectionCard}>
+          <h3 style={styles.sectionCardTitle}>Balance Trend</h3>
+          <Text style={styles.trendDescription}>
+            Your balance has increased by <Text style={styles.trendHighlight}>$1,250</Text> this year ✨
+          </Text>
+          <View style={styles.trendChartContainer}>
+             {/* We use line chart here */}
+             {chartType !== 'line' ? (
+                <TouchableOpacity style={styles.viewTrendButton} onPress={() => setChartType('line')}>
+                  <Text style={styles.viewTrendButtonText}>View Detailed Trend</Text>
+                </TouchableOpacity>
+             ) : renderChart()}
+          </View>
+          {chartType === 'line' && (
+            <View style={styles.trendXAxis}>
+              <Text style={styles.xAxisLabel}>Jan</Text>
+              <Text style={styles.xAxisLabel}>Jun</Text>
+              <Text style={styles.xAxisLabel}>Dec</Text>
+            </View>
+          )}
+        </View>
 
         {/* Monexa Insights */}
-        <View style={styles.section}>
+        <View style={styles.insightsSection}>
           <View style={styles.insightsHeader}>
-            <Ionicons name="bulb" size={24} color="#D32F2F" />
-            <Text style={styles.sectionTitle}>Monexa Insights</Text>
+            <Ionicons name="bulb" size={24} color={COLORS.primary} />
+            <Text style={styles.insightsTitle}>Monexa Insights</Text>
           </View>
           {insights.length > 0 ? (
             <View style={styles.insightsList}>
               {insights.map((insight, index) => (
                 <View key={index} style={styles.insightCard}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  <Ionicons name="checkmark-circle" size={20} color={COLORS.income} />
                   <Text style={styles.insightText}>{insight}</Text>
                 </View>
               ))}
@@ -626,7 +540,7 @@ export default function InsightsScreen() {
           style={styles.chatButton}
           onPress={() => router.push('/(tabs)/chat')}
         >
-          <Ionicons name="chatbubbles" size={20} color="#FFFFFF" />
+          <Ionicons name="chatbubbles" size={20} color={COLORS.white} />
           <Text style={styles.chatButtonText}>Ask Monexa for More Insights</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -637,200 +551,284 @@ export default function InsightsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: 'rgba(251, 247, 241, 0.9)',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1F2937',
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.bgElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOW.soft,
   },
   scrollView: {
     flex: 1,
   },
-  section: {
-    paddingHorizontal: 24,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  introSection: {
+    marginTop: 20,
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 16,
+  introTitle: {
+    fontSize: 32,
+    fontFamily: FONTS.displayExtra,
+    color: COLORS.ink,
+    lineHeight: 38,
   },
-  chartTypeSelector: {
+  introSubRow: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
   },
-  chartTypeButton: {
+  introSubtitle: {
+    fontSize: 15,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.inkSoft,
     flex: 1,
+  },
+  timeRangeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-  },
-  chartTypeButtonActive: {
-    backgroundColor: '#D32F2F',
-    borderColor: '#D32F2F',
-  },
-  chartTypeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  chartTypeButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  periodSelector: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  periodChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    backgroundColor: COLORS.bgElevated,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    gap: 6,
+    ...SHADOW.soft,
   },
-  periodChipActive: {
-    backgroundColor: '#D32F2F',
-    borderColor: '#D32F2F',
-  },
-  periodChipText: {
+  timeRangeText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
+    fontFamily: FONTS.bodySemi,
+    color: COLORS.primary,
   },
-  periodChipTextActive: {
-    color: '#FFFFFF',
-  },
-  viewModeSelector: {
+  totalSpentCard: {
+    backgroundColor: COLORS.bgElevated,
+    borderRadius: RADIUS.card,
+    padding: 24,
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    position: 'relative',
+    overflow: 'hidden',
+    ...SHADOW.card,
   },
-  viewModeButton: {
+  totalSpentLeft: {
+    zIndex: 2,
     flex: 1,
-    paddingVertical: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    alignItems: 'center',
   },
-  viewModeButtonActive: {
-    backgroundColor: '#D32F2F',
-    borderColor: '#D32F2F',
-  },
-  viewModeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  viewModeButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  chartContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-  },
-  emptyChart: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-  },
-  emptyChartText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 16,
+  totalSpentLabel: {
+    fontSize: 15,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.inkSoft,
     marginBottom: 4,
   },
-  emptyChartSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
+  totalSpentValue: {
+    fontSize: 40,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+    lineHeight: 44,
   },
-  pieLegend: {
-    marginTop: 24,
-    gap: 8,
-    width: '100%',
-    paddingHorizontal: 20,
-  },
-  legendItem: {
+  trendBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: COLORS.expenseSoft,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    gap: 6,
   },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
+  trendText: {
+    fontSize: 13,
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.expense,
   },
-  legendText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1F2937',
+  totalSpentMascot: {
+    zIndex: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: 80,
+    backgroundColor: COLORS.bg,
+    borderRadius: 40,
+    ...SHADOW.soft,
   },
-  legendValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
+  cardDecoration: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: COLORS.primarySoft,
+    opacity: 0.5,
   },
-  lineChartLegend: {
+  chartSectionCard: {
+    backgroundColor: COLORS.bgElevated,
+    borderRadius: RADIUS.card,
+    padding: 24,
+    marginBottom: 24,
+    ...SHADOW.soft,
+  },
+  sectionCardTitle: {
+    fontSize: 20,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+    marginBottom: 20,
+  },
+  sectionHeaderRow: {
     flexDirection: 'row',
-    gap: 20,
-    marginTop: 16,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.primary,
+  },
+  pieContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  pieChartWrapper: {
+    width: 120,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pieCenter: {
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  pieCenterText: {
-    fontSize: 12,
-    color: '#6B7280',
   },
   pieCenterValue: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
   },
-  statsGrid: {
+  pieLegend: {
+    flex: 1,
     gap: 12,
   },
-  statCard: {
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+  legendItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  statLabel: {
+  legendLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.ink,
+    flex: 1,
   },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1F2937',
+  legendValue: {
+    fontSize: 14,
+    fontFamily: FONTS.bodySemi,
+    color: COLORS.inkSoft,
   },
-  incomeValue: {
-    color: '#10B981',
+  barList: {
+    gap: 16,
   },
-  expenseValue: {
-    color: '#EF4444',
+  barItem: {
+    gap: 6,
+  },
+  barInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  barLabel: {
+    fontSize: 14,
+    fontFamily: FONTS.bodySemi,
+    color: COLORS.ink,
+  },
+  barValue: {
+    fontSize: 14,
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.ink,
+  },
+  barTrack: {
+    height: 12,
+    backgroundColor: COLORS.bg,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  trendDescription: {
+    fontSize: 14,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.inkSoft,
+    marginBottom: 20,
+  },
+  trendHighlight: {
+    color: COLORS.income,
+    fontFamily: FONTS.bodyBold,
+  },
+  trendChartContainer: {
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewTrendButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: COLORS.primarySoft,
+    borderRadius: 20,
+  },
+  viewTrendButtonText: {
+    fontSize: 14,
+    fontFamily: FONTS.bodySemi,
+    color: COLORS.primaryDark,
+  },
+  trendXAxis: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  xAxisLabel: {
+    fontSize: 12,
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.inkSoft,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  insightsSection: {
+    marginTop: 8,
   },
   insightsHeader: {
     flexDirection: 'row',
@@ -838,131 +836,103 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 16,
   },
+  insightsTitle: {
+    fontSize: 20,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+  },
   insightsList: {
     gap: 12,
   },
   insightCard: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    backgroundColor: COLORS.bgElevated,
     padding: 16,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderRadius: 16,
+    gap: 12,
+    ...SHADOW.soft,
   },
   insightText: {
-    flex: 1,
     fontSize: 14,
+    fontFamily: FONTS.body,
+    color: COLORS.ink,
+    flex: 1,
     lineHeight: 20,
-    color: '#1F2937',
   },
   noInsights: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
     textAlign: 'center',
-    paddingVertical: 24,
+    marginVertical: 20,
   },
   chatButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 24,
-    marginBottom: 32,
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    backgroundColor: '#D32F2F',
-    borderRadius: 12,
+    borderRadius: RADIUS.button,
+    marginTop: 32,
+    gap: 10,
+    ...SHADOW.card,
   },
   chatButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.bodySemi,
+    color: COLORS.white,
   },
-  customDateContainer: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  customDateLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 12,
-  },
-  dateInputsRow: {
-    flexDirection: 'row',
+  emptyChart: {
+    height: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
   },
-  dateInputWrapper: {
-    flex: 1,
+  emptyChartText: {
+    fontSize: 18,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
   },
-  dateInputLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  dateInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-  },
-  dateInputText: {
+  emptyChartSubtext: {
     fontSize: 14,
-    color: '#1F2937',
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
+    textAlign: 'center',
   },
-  applyDateButton: {
-    marginTop: 12,
-    paddingVertical: 12,
-    backgroundColor: '#D32F2F',
-    borderRadius: 8,
+  chartContainer: {
     alignItems: 'center',
-  },
-  applyDateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
   upgradePrompt: {
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
+    padding: 24,
+    gap: 12,
   },
   upgradeTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 16,
-    marginBottom: 8,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
     textAlign: 'center',
   },
   upgradeText: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 16,
   },
   upgradeButton: {
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#D32F2F',
-    borderRadius: 8,
+    borderRadius: 12,
+    marginTop: 8,
   },
   upgradeButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
+    fontFamily: FONTS.bodyBold,
     fontSize: 14,
-    fontWeight: '600',
   },
 });

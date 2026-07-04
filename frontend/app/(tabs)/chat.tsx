@@ -14,7 +14,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import api from '../../utils/api';
+import { COLORS, RADIUS, SHADOW, FONTS } from '../../constants/theme';
+import { Mascot } from '../../components/Mascot';
 
 interface ChatMessage {
   id: string;
@@ -24,12 +27,20 @@ interface ChatMessage {
 }
 
 export default function ChatScreen() {
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  const suggestedPrompts = [
+    "Am I on track this month?",
+    "How much did I spend on food?",
+    "Set a $200 budget for groceries",
+    "Analyze my recent spending"
+  ];
 
   useEffect(() => {
     loadChatHistory();
@@ -45,7 +56,7 @@ export default function ChatScreen() {
         const welcomeMessage = {
           id: 'welcome',
           role: 'assistant',
-          text: "Hey! 👋 I'm Monexa, your financial buddy. I've got full visibility into your spending, income, and categories. Want some insights on your finances, or do you have any questions for me?",
+          text: "Hi there! 👋 I'm Momo, your financial wing-owl. What can I help you with today?",
           created_at: new Date().toISOString(),
         };
         setMessages([welcomeMessage]);
@@ -128,11 +139,12 @@ export default function ChatScreen() {
     );
   };
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || loading) return;
+  const sendMessage = async (text?: string) => {
+    const messageToSend = text || inputText;
+    if (!messageToSend.trim() || loading) return;
 
-    const userMessage = inputText.trim();
-    setInputText('');
+    const userMessage = messageToSend.trim();
+    if (!text) setInputText('');
 
     // Add user message to UI
     const tempUserMessage: ChatMessage = {
@@ -168,27 +180,37 @@ export default function ChatScreen() {
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => (
-    <View
-      style={[
-        styles.messageContainer,
-        item.role === 'user' ? styles.userMessage : styles.aiMessage,
-      ]}
-    >
-      <Text
+    <View style={[
+      styles.messageWrapper,
+      item.role === 'user' ? styles.userMessageWrapper : styles.aiMessageWrapper
+    ]}>
+      {item.role !== 'user' && (
+        <View style={styles.mascotBubbleContainer}>
+          <Mascot mood={messages.indexOf(item) === 0 ? "waving" : "happy"} size={32} />
+        </View>
+      )}
+      <View
         style={[
-          styles.messageText,
-          item.role === 'user' ? styles.userMessageText : styles.aiMessageText,
+          styles.messageContainer,
+          item.role === 'user' ? styles.userMessage : styles.aiMessage,
         ]}
       >
-        {item.text}
-      </Text>
+        <Text
+          style={[
+            styles.messageText,
+            item.role === 'user' ? styles.userMessageText : styles.aiMessageText,
+          ]}
+        >
+          {item.text}
+        </Text>
+      </View>
     </View>
   );
 
   if (initialLoad) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#D32F2F" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
@@ -196,9 +218,21 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Ask Monexa</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={COLORS.ink} />
+          </TouchableOpacity>
+          <View style={styles.mascotContainer}>
+            <Mascot mood="happy" size={42} />
+            <View style={styles.onlineStatus} />
+          </View>
+          <View>
+            <Text style={styles.title}>Monexa</Text>
+            <Text style={styles.statusText}>Always online ✨</Text>
+          </View>
+        </View>
         <TouchableOpacity onPress={() => setShowMenu(true)}>
-          <Ionicons name="ellipsis-vertical" size={24} color="#1F2937" />
+          <Ionicons name="ellipsis-vertical" size={24} color={COLORS.ink} />
         </TouchableOpacity>
       </View>
 
@@ -215,17 +249,17 @@ export default function ChatScreen() {
         >
           <View style={styles.menuContainer}>
             <TouchableOpacity style={styles.menuItem} onPress={handleNewChat}>
-              <Ionicons name="add-circle-outline" size={20} color="#1F2937" />
+              <Ionicons name="add-circle-outline" size={20} color={COLORS.ink} />
               <Text style={styles.menuItemText}>Start New Chat</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.menuItem} onPress={handleClearChat}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              <Ionicons name="trash-outline" size={20} color={COLORS.expense} />
               <Text style={[styles.menuItemText, styles.menuItemDanger]}>Clear History</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.menuItem} onPress={() => setShowMenu(false)}>
-              <Ionicons name="close-circle-outline" size={20} color="#6B7280" />
+              <Ionicons name="close-circle-outline" size={20} color={COLORS.inkSoft} />
               <Text style={styles.menuItemText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -239,7 +273,7 @@ export default function ChatScreen() {
       >
         {messages.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={64} color="#E5E7EB" />
+            <Mascot mood="thinking" size={120} />
             <Text style={styles.emptyStateText}>Start a conversation</Text>
             <Text style={styles.emptyStateSubtext}>
               Ask me about your spending, budgets, or financial insights
@@ -256,26 +290,55 @@ export default function ChatScreen() {
           />
         )}
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Ask Monexa..."
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, (!inputText.trim() || loading) && styles.sendButtonDisabled]}
-            onPress={sendMessage}
-            disabled={!inputText.trim() || loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Ionicons name="send" size={20} color="#FFFFFF" />
+        <View style={styles.bottomSection}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={suggestedPrompts}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={styles.promptChip}
+                onPress={() => sendMessage(item)}
+              >
+                <Text style={styles.promptText}>{item}</Text>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+            keyExtractor={(item) => item}
+            style={styles.promptsList}
+            contentContainerStyle={styles.promptsContainer}
+          />
+          <View style={styles.inputOuterContainer}>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Ask Momo anything..."
+                placeholderTextColor={COLORS.inkSoft}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendButton, 
+                  (!inputText.trim() || loading) && styles.sendButtonDisabled,
+                  inputText.trim() && { backgroundColor: COLORS.primary }
+                ]}
+                onPress={() => sendMessage()}
+                disabled={!inputText.trim() || loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={COLORS.white} size="small" />
+                ) : (
+                  <Ionicons 
+                    name="send" 
+                    size={20} 
+                    color={inputText.trim() ? COLORS.white : COLORS.primary} 
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -285,79 +348,176 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bg,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(251, 247, 241, 0.9)',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.primarySoft,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    marginRight: 8,
+    marginLeft: -8,
+    padding: 4,
+  },
+  mascotContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primarySoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: COLORS.bgElevated,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  onlineStatus: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: COLORS.income,
+    borderWidth: 2,
+    borderColor: COLORS.bgElevated,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 20,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+    lineHeight: 24,
+  },
+  statusText: {
+    fontSize: 13,
+    color: COLORS.income,
+    fontFamily: FONTS.bodyMedium,
   },
   chatContainer: {
     flex: 1,
   },
   messagesContainer: {
-    padding: 24,
-    gap: 12,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  messageWrapper: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    alignItems: 'flex-end',
+  },
+  userMessageWrapper: {
+    justifyContent: 'flex-end',
+  },
+  aiMessageWrapper: {
+    justifyContent: 'flex-start',
+  },
+  mascotBubbleContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primarySoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    overflow: 'hidden',
   },
   messageContainer: {
     maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    ...SHADOW.soft,
   },
   userMessage: {
-    backgroundColor: '#D32F2F',
-    alignSelf: 'flex-end',
-    borderBottomRightRadius: 4,
+    backgroundColor: COLORS.ink,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 8,
   },
   aiMessage: {
-    backgroundColor: '#F3F4F6',
-    alignSelf: 'flex-start',
-    borderBottomLeftRadius: 4,
+    backgroundColor: COLORS.primarySoft,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 8,
   },
   messageText: {
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 22,
+    fontFamily: FONTS.body,
   },
   userMessageText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
   },
   aiMessageText: {
-    color: '#1F2937',
+    color: COLORS.ink,
+  },
+  bottomSection: {
+    paddingBottom: Platform.OS === 'ios' ? 0 : 20,
+    backgroundColor: 'transparent',
+  },
+  promptsList: {
+    maxHeight: 50,
+    marginBottom: 8,
+  },
+  promptsContainer: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  promptChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: COLORS.bgElevated,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.primarySoft,
+    ...SHADOW.soft,
+  },
+  promptText: {
+    fontSize: 13,
+    color: COLORS.primaryDark,
+    fontFamily: FONTS.bodyMedium,
+  },
+  inputOuterContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    paddingTop: 8,
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    alignItems: 'flex-end',
+    backgroundColor: COLORS.bgElevated,
+    borderRadius: 32,
+    padding: 6,
+    ...SHADOW.card,
   },
   input: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 100,
+    minHeight: 48,
+    maxHeight: 120,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 22,
+    paddingTop: 12,
+    paddingBottom: 12,
     fontSize: 15,
-    color: '#1F2937',
+    fontFamily: FONTS.body,
+    color: COLORS.ink,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#D32F2F',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -368,50 +528,49 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 40,
   },
   emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 16,
+    fontSize: 20,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+    marginTop: 20,
     marginBottom: 8,
   },
   emptyStateSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 15,
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
     textAlign: 'center',
+    lineHeight: 22,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-start',
     paddingTop: 80,
     paddingHorizontal: 20,
   },
   menuContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: COLORS.bgElevated,
+    borderRadius: RADIUS.card,
     padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    ...SHADOW.card,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: RADIUS.button,
   },
   menuItemText: {
     fontSize: 16,
-    color: '#1F2937',
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.ink,
+    marginLeft: 12,
   },
   menuItemDanger: {
-    color: '#EF4444',
+    color: COLORS.expense,
   },
 });

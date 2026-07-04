@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
 import { format } from 'date-fns';
+import { COLORS, RADIUS, SHADOW, FONTS } from '../constants/theme';
 
 interface Category {
   id: string;
@@ -25,14 +26,14 @@ interface Category {
 
 // Common income sources
 const INCOME_SOURCES = [
-  'Salary',
-  'Freelance',
-  'Business',
-  'Investment',
-  'Rental',
-  'Gift',
-  'Bonus',
-  'Other',
+  { id: 'salary', name: 'Salary', icon: '💼' },
+  { id: 'freelance', name: 'Freelance', icon: '💻' },
+  { id: 'business', name: 'Business', icon: '🏢' },
+  { id: 'investment', name: 'Investment', icon: '📈' },
+  { id: 'rental', name: 'Rental', icon: '🏠' },
+  { id: 'gift', name: 'Gift', icon: '🎁' },
+  { id: 'bonus', name: 'Bonus', icon: '🧧' },
+  { id: 'other', name: 'Other', icon: '✨' },
 ];
 
 export default function AddTransactionScreen() {
@@ -55,7 +56,7 @@ export default function AddTransactionScreen() {
     // Reset selection when type changes - treat missing type as 'expense'
     const filteredCats = categories.filter(c => (c.type || 'expense') === type);
     if (type === 'income') {
-      setIncomeSource(INCOME_SOURCES[0]);
+      setIncomeSource(INCOME_SOURCES[0].name);
       setCategoryId(filteredCats.length > 0 ? filteredCats[0].name : '');
     } else {
       setCategoryId(filteredCats.length > 0 ? filteredCats[0].name : '');
@@ -128,7 +129,7 @@ export default function AddTransactionScreen() {
   if (loadingCategories) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#D32F2F" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
@@ -140,165 +141,171 @@ export default function AddTransactionScreen() {
         style={styles.keyboardView}
       >
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="close" size={28} color="#1F2937" />
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.ink} />
           </TouchableOpacity>
-          <Text style={styles.title}>Add Transaction</Text>
-          <View style={{ width: 28 }} />
+          <Text style={styles.title}>New Transaction</Text>
+          <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView style={styles.content}>
-          <View style={styles.typeSelector}>
-            <TouchableOpacity
-              style={[
-                styles.typeButton,
-                type === 'expense' && styles.typeButtonActive,
-              ]}
-              onPress={() => setType('expense')}
-            >
-              <Ionicons
-                name="arrow-up"
-                size={20}
-                color={type === 'expense' ? '#FFFFFF' : '#EF4444'}
-              />
-              <Text
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.typeSelectorContainer}>
+            <View style={styles.typeSelector}>
+              <TouchableOpacity
                 style={[
-                  styles.typeButtonText,
-                  type === 'expense' && styles.typeButtonTextActive,
+                  styles.typeButton,
+                  type === 'expense' && styles.typeButtonExpenseActive,
                 ]}
+                onPress={() => setType('expense')}
               >
-                Expense
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.typeButton,
-                type === 'income' && styles.typeButtonActive,
-              ]}
-              onPress={() => setType('income')}
-            >
-              <Ionicons
-                name="arrow-down"
-                size={20}
-                color={type === 'income' ? '#FFFFFF' : '#10B981'}
-              />
-              <Text
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    type === 'expense' && styles.typeButtonTextActive,
+                  ]}
+                >
+                  Expense
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[
-                  styles.typeButtonText,
-                  type === 'income' && styles.typeButtonTextActive,
+                  styles.typeButton,
+                  type === 'income' && styles.typeButtonIncomeActive,
                 ]}
+                onPress={() => setType('income')}
               >
-                Income
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    type === 'income' && styles.typeButtonTextActive,
+                  ]}
+                >
+                  Income
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Amount *</Text>
+          <View style={styles.amountContainer}>
+            <Text style={styles.labelAmount}>Amount</Text>
+            <View style={styles.amountInputRow}>
+              <Text style={[styles.currencyPrefix, { color: type === 'expense' ? COLORS.expense : COLORS.income }]}>$</Text>
               <TextInput
-                style={styles.input}
+                style={styles.amountInput}
                 placeholder="0.00"
+                placeholderTextColor={COLORS.inkSoft + '40'}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="decimal-pad"
+                autoFocus
               />
             </View>
+          </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Category *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.categoryList}>
-                  {categories.filter(cat => (cat.type || 'expense') === type).length > 0 ? (
-                    categories.filter(cat => (cat.type || 'expense') === type).map((cat) => (
-                      <TouchableOpacity
-                        key={cat.id}
-                        style={[
-                          styles.categoryChip,
-                          categoryId === cat.name && styles.categoryChipActive,
-                        ]}
-                        onPress={() => setCategoryId(cat.name)}
-                      >
-                        <Text
-                          style={[
-                            styles.categoryChipText,
-                            categoryId === cat.name && styles.categoryChipTextActive,
-                          ]}
-                        >
-                          {cat.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <Text style={styles.noCategoriesText}>
-                      No {type} categories. Add one in Profile → Categories.
+          <View style={styles.formCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Category</Text>
+              <TouchableOpacity 
+                style={styles.addButton}
+                onPress={() => router.push('/categories' as any)}
+              >
+                <Ionicons name="add" size={16} color={COLORS.primary} />
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.grid}>
+              {categories.filter(cat => (cat.type || 'expense') === type).length > 0 ? (
+                categories.filter(cat => (cat.type || 'expense') === type).map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.categoryCard,
+                      categoryId === cat.name && (type === 'expense' ? styles.categoryCardExpenseActive : styles.categoryCardIncomeActive),
+                    ]}
+                    onPress={() => setCategoryId(cat.name)}
+                  >
+                    <Text style={styles.categoryEmoji}>
+                      {type === 'income' ? '💰' : '💸'}
                     </Text>
-                  )}
-                </View>
-              </ScrollView>
+                    <Text
+                      style={[
+                        styles.categoryLabel,
+                        categoryId === cat.name && styles.categoryLabelActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={styles.noCategoriesText}>
+                  No {type} categories found.
+                </Text>
+              )}
             </View>
 
             {type === 'income' && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Income Source (Optional)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.categoryList}>
+              <>
+                <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>Income Source</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                  <View style={styles.sourceList}>
                     {INCOME_SOURCES.map((source) => (
                       <TouchableOpacity
-                        key={source}
+                        key={source.id}
                         style={[
-                          styles.categoryChip,
-                          incomeSource === source && styles.categoryChipActive,
+                          styles.sourceChip,
+                          incomeSource === source.name && styles.sourceChipActive,
                         ]}
-                        onPress={() => setIncomeSource(source)}
+                        onPress={() => setIncomeSource(source.name)}
                       >
+                        <Text style={styles.sourceEmoji}>{source.icon}</Text>
                         <Text
                           style={[
-                            styles.categoryChipText,
-                            incomeSource === source && styles.categoryChipTextActive,
+                            styles.sourceChipText,
+                            incomeSource === source.name && styles.sourceChipTextActive,
                           ]}
                         >
-                          {source}
+                          {source.name}
                         </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 </ScrollView>
-              </View>
+              </>
             )}
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Date</Text>
-              <TouchableOpacity style={styles.dateInput}>
-                <Text style={styles.dateText}>{format(date, 'MMM dd, yyyy')}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Note (Optional)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Add a note..."
-                value={note}
-                onChangeText={setNote}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
+            <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>Note</Text>
+            <TextInput
+              style={styles.noteInput}
+              placeholder="What was this for?"
+              placeholderTextColor={COLORS.inkSoft + '80'}
+              value={note}
+              onChangeText={setNote}
+              multiline
+            />
           </View>
         </ScrollView>
 
         <View style={styles.footer}>
           <TouchableOpacity
-            style={styles.saveButton}
+            style={[
+              styles.saveButton,
+              { backgroundColor: type === 'expense' ? COLORS.expense : COLORS.income }
+            ]}
             onPress={handleSave}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={COLORS.white} />
             ) : (
-              <Text style={styles.saveButtonText}>Save Transaction</Text>
+              <Text style={styles.saveButtonText}>
+                Save {type === 'expense' ? 'Expense' : 'Income'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -310,7 +317,7 @@ export default function AddTransactionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bg,
   },
   keyboardView: {
     flex: 1,
@@ -322,126 +329,236 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: SHADOW.soft,
+      android: { ...SHADOW.soft, elevation: 2 },
+    }),
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
   },
   content: {
     flex: 1,
   },
+  typeSelectorContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
   typeSelector: {
     flexDirection: 'row',
-    gap: 12,
-    padding: 24,
+    backgroundColor: COLORS.white,
+    padding: 6,
+    borderRadius: 30,
+    ...Platform.select({
+      ios: SHADOW.soft,
+      android: { ...SHADOW.soft, elevation: 2 },
+    }),
   },
   typeButton: {
     flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 24,
+  },
+  typeButtonExpenseActive: {
+    backgroundColor: COLORS.expense,
+  },
+  typeButtonIncomeActive: {
+    backgroundColor: COLORS.income,
+  },
+  typeButtonText: {
+    fontSize: 14,
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.inkSoft,
+  },
+  typeButtonTextActive: {
+    color: COLORS.white,
+  },
+  amountContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  labelAmount: {
+    fontSize: 14,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.inkSoft,
+    marginBottom: 8,
+  },
+  amountInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
+  },
+  currencyPrefix: {
+    fontSize: 32,
+    fontFamily: FONTS.display,
+    marginRight: 4,
+  },
+  amountInput: {
+    fontSize: 56,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+    minWidth: 150,
+    textAlign: 'center',
+  },
+  formCard: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: RADIUS.card,
+    borderTopRightRadius: RADIUS.card,
+    padding: 24,
+    paddingBottom: 120,
+    flex: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#4C3F91',
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.primarySoft,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  addButtonText: {
+    fontSize: 12,
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.primary,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  categoryCard: {
+    width: (Platform.OS === 'web' ? 100 : 96),
+    aspectRatio: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderColor: 'transparent',
   },
-  typeButtonActive: {
-    backgroundColor: '#D32F2F',
-    borderColor: '#D32F2F',
+  categoryCardExpenseActive: {
+    backgroundColor: COLORS.expenseSoft,
+    borderColor: COLORS.expense,
   },
-  typeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+  categoryCardIncomeActive: {
+    backgroundColor: COLORS.incomeSoft,
+    borderColor: COLORS.income,
   },
-  typeButtonTextActive: {
-    color: '#FFFFFF',
+  categoryEmoji: {
+    fontSize: 24,
+    marginBottom: 4,
   },
-  form: {
+  categoryLabel: {
+    fontSize: 10,
+    fontFamily: FONTS.bodySemi,
+    color: COLORS.inkSoft,
+    textAlign: 'center',
+  },
+  categoryLabelActive: {
+    color: COLORS.ink,
+  },
+  horizontalScroll: {
+    marginHorizontal: -24,
     paddingHorizontal: 24,
-    gap: 20,
   },
-  inputContainer: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1F2937',
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  categoryList: {
+  sourceList: {
     flexDirection: 'row',
     gap: 8,
   },
-  categoryChip: {
+  sourceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    paddingVertical: 10,
+    backgroundColor: '#F9FAFB',
     borderRadius: 20,
   },
-  categoryChipActive: {
-    backgroundColor: '#D32F2F',
-    borderColor: '#D32F2F',
+  sourceChipActive: {
+    backgroundColor: COLORS.primarySoft,
   },
-  categoryChipText: {
-    fontSize: 14,
-    color: '#1F2937',
+  sourceEmoji: {
+    fontSize: 16,
   },
-  categoryChipTextActive: {
-    color: '#FFFFFF',
+  sourceChipText: {
+    fontSize: 13,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.inkSoft,
+  },
+  sourceChipTextActive: {
+    color: COLORS.primary,
+    fontFamily: FONTS.bodyBold,
+  },
+  noteInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    fontSize: 15,
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.ink,
+    minHeight: 56,
   },
   noCategoriesText: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
     fontStyle: 'italic',
-    paddingVertical: 8,
-  },
-  dateInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  dateText: {
-    fontSize: 16,
-    color: '#1F2937',
   },
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   saveButton: {
-    backgroundColor: '#D32F2F',
-    paddingVertical: 16,
-    borderRadius: 12,
+    height: 56,
+    borderRadius: 20,
     alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: SHADOW.card,
+      android: { ...SHADOW.card, elevation: 4 },
+    }),
   },
   saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: 18,
+    fontFamily: FONTS.bodyBold,
   },
 });

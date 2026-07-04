@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +16,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import { useCallback } from 'react';
+import { COLORS, RADIUS, SHADOW, FONTS } from '../../constants/theme';
+import { Mascot } from '../../components/Mascot';
 
 interface AnalyticsSummary {
   balance: number;
@@ -77,65 +80,82 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#D32F2F" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
 
+  const balanceParts = formatNumber(summary?.balance || 0).split('.');
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
         }
       >
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Hello,</Text>
-            <Text style={styles.userName}>{user?.full_name}</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/notifications' as any)}>
-            <View>
-              <Ionicons name="notifications-outline" size={24} color="#1F2937" />
-              {summary?.budget_alert && <View style={styles.notificationDot} />}
+          <View style={styles.headerLeft}>
+            <View style={styles.avatarContainer}>
+              <Mascot mood="happy" size={56} />
             </View>
+            <View>
+              <Text style={styles.greeting}>Good morning,</Text>
+              <Text style={styles.userName}>Hi {user?.full_name?.split(' ')[0] || 'User'} 👋</Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={() => router.push('/notifications' as any)}
+          >
+            <Ionicons name="notifications-outline" size={24} color={COLORS.ink} />
+            {summary?.budget_alert && <View style={styles.notificationDot} />}
           </TouchableOpacity>
         </View>
 
-        {summary?.budget_alert && (
-          <TouchableOpacity
-            style={styles.budgetAlertCard}
-            onPress={() => router.push('/(tabs)/insights' as any)}
-          >
-            <Ionicons name="warning" size={20} color="#B45309" />
-            <Text style={styles.budgetAlertText}>
-              You've used {summary.budget_percent_used}% of your monthly budget
-              {summary.monthly_budget ? ` (${user?.currency || 'USD'} ${formatNumber(summary.monthly_budget)})` : ''}.
-            </Text>
-          </TouchableOpacity>
-        )}
-
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Current Balance</Text>
+          <View style={styles.balanceCircleTop} />
+          <View style={styles.balanceCircleBottom} />
+          
+          <View style={styles.balanceHeader}>
+            <Text style={styles.balanceLabel}>Total Balance</Text>
+            <View style={styles.currencyBadge}>
+              <Text style={styles.currencyText}>{user?.currency || 'USD'}</Text>
+            </View>
+          </View>
+
           <Text style={styles.balanceAmount}>
-            {user?.currency || 'USD'} {formatNumber(summary?.balance || 0)}
+            {user?.currency === 'USD' || !user?.currency ? '$' : user.currency + ' '}
+            {balanceParts[0]}
+            {balanceParts[1] && <Text style={styles.balanceDecimals}>.{balanceParts[1]}</Text>}
           </Text>
+
+          <View style={styles.balanceDivider} />
+
           <View style={styles.balanceDetails}>
             <View style={styles.balanceItem}>
-              <Ionicons name="arrow-down" size={20} color="#10B981" />
+              <View style={styles.balanceIconContainer}>
+                <Ionicons name="arrow-down" size={20} color={COLORS.white} />
+              </View>
               <View>
                 <Text style={styles.balanceItemLabel}>Income</Text>
                 <Text style={styles.balanceItemValue}>
+                  {user?.currency === 'USD' || !user?.currency ? '$' : ''}
                   {formatNumber(summary?.total_income || 0)}
                 </Text>
               </View>
             </View>
+            <View style={styles.balanceVerticalDivider} />
             <View style={styles.balanceItem}>
-              <Ionicons name="arrow-up" size={20} color="#EF4444" />
+              <View style={styles.balanceIconContainer}>
+                <Ionicons name="arrow-up" size={20} color={COLORS.white} />
+              </View>
               <View>
                 <Text style={styles.balanceItemLabel}>Expenses</Text>
                 <Text style={styles.balanceItemValue}>
+                  {user?.currency === 'USD' || !user?.currency ? '$' : ''}
                   {formatNumber(summary?.total_expense || 0)}
                 </Text>
               </View>
@@ -143,117 +163,79 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.quickActions}>
+        {summary?.budget_alert && (
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push('/add-transaction' as any)}
+            style={styles.budgetAlertCard}
+            onPress={() => router.push('/(tabs)/insights' as any)}
           >
-            <Ionicons name="add-circle" size={20} color="#D32F2F" />
-            <Text style={styles.actionButtonText}>Add Transaction</Text>
+            <Ionicons name="warning" size={20} color={COLORS.expense} />
+            <Text style={styles.budgetAlertText}>
+              You've used {summary.budget_percent_used}% of your monthly budget
+              {summary.monthly_budget ? ` (${user?.currency || 'USD'} ${formatNumber(summary.monthly_budget)})` : ''}.
+            </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push('/(tabs)/insights')}
-          >
-            <Ionicons name="analytics" size={20} color="#D32F2F" />
-            <Text style={styles.actionButtonText}>Quick Insights</Text>
-          </TouchableOpacity>
-        </View>
+        )}
 
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push('/(tabs)/chat')}
-          >
-            <Ionicons name="chatbubbles" size={20} color="#D32F2F" />
-            <Text style={styles.actionButtonText}>Ask Monexa</Text>
-          </TouchableOpacity>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity 
+              style={styles.seeAllButton}
+              onPress={() => router.push('/(tabs)/transactions')}
+            >
+              <Text style={styles.seeAll}>See All</Text>
+              <Ionicons name="arrow-forward" size={16} color={COLORS.primary} />
+            </TouchableOpacity>
+          </View>
           
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push('/budget' as any)}
-          >
-            <Ionicons name="wallet" size={20} color="#D32F2F" />
-            <Text style={styles.actionButtonText}>Set Budget</Text>
-          </TouchableOpacity>
-        </View>
-
-        {transactions.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Transactions</Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/transactions')}>
-                <Text style={styles.seeAll}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.transactionsList}>
-              {transactions.slice(0, 5).map((tx, index) => (
-                <View key={tx.id || index} style={styles.transactionItem}>
+          <View style={styles.transactionsList}>
+            {transactions.length > 0 ? (
+              transactions.slice(0, 5).map((tx, index) => (
+                <TouchableOpacity 
+                  key={tx.id || index} 
+                  style={styles.transactionItem}
+                  onPress={() => router.push(`/edit-transaction/${tx.id}` as any)}
+                >
                   <View style={styles.transactionLeft}>
-                    <View style={[styles.transactionIcon, { backgroundColor: tx.type === 'income' ? '#D1FAE5' : '#FEE2E2' }]}>
-                      <Ionicons 
-                        name={tx.type === 'income' ? 'arrow-down' : 'arrow-up'} 
-                        size={16} 
-                        color={tx.type === 'income' ? '#10B981' : '#EF4444'} 
-                      />
+                    <View style={[styles.transactionIcon, { backgroundColor: tx.type === 'income' ? COLORS.incomeSoft : COLORS.primarySoft }]}>
+                      <Text style={styles.transactionEmoji}>
+                        {tx.type === 'income' ? '💰' : '💸'}
+                      </Text>
                     </View>
                     <View>
-                      <Text style={styles.transactionTitle}>
+                      <Text style={styles.transactionTitle} numberOfLines={1}>
                         {tx.type === 'income' ? (tx.income_source || 'Income') : tx.category_name}
                       </Text>
                       <Text style={styles.transactionDate}>{tx.date}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.transactionAmount, { color: tx.type === 'income' ? '#10B981' : '#EF4444' }]}>
-                    {tx.type === 'income' ? '+' : '-'}{user?.currency || 'USD'} {formatNumber(tx.amount)}
+                  <Text style={[styles.transactionAmount, { color: tx.type === 'income' ? COLORS.income : COLORS.ink }]}>
+                    {tx.type === 'income' ? '+' : ''}
+                    {user?.currency === 'USD' || !user?.currency ? '$' : ''}
+                    {formatNumber(tx.amount)}
                   </Text>
-                </View>
-              ))}
-            </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyStateMini}>
+                <Text style={styles.emptyStateTextMini}>No recent activity</Text>
+              </View>
+            )}
           </View>
-        )}
+        </View>
 
-        {summary && summary.top_spending_categories.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Top Spending</Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/insights')}>
-                <Text style={styles.seeAll}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.categoriesList}>
-              {summary.top_spending_categories.slice(0, 3).map((cat, index) => (
-                <View key={index} style={styles.categoryItem}>
-                  <View style={styles.categoryLeft}>
-                    <Ionicons name="pricetag" size={20} color="#6B7280" />
-                    <Text style={styles.categoryName}>{cat.name}</Text>
-                  </View>
-                  <Text style={styles.categoryAmount}>
-                    {user?.currency || 'USD'} {formatNumber(cat.amount)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {(!summary || summary.transaction_count === 0) && (
-          <View style={styles.emptyState}>
-            <Ionicons name="wallet-outline" size={64} color="#E5E7EB" />
-            <Text style={styles.emptyStateText}>No transactions yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Start tracking your income and expenses
-            </Text>
-            <TouchableOpacity
-              style={styles.emptyStateButton}
-              onPress={() => router.push('/add-transaction' as any)}
-            >
-              <Text style={styles.emptyStateButtonText}>Add First Transaction</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <View style={styles.spacer} />
       </ScrollView>
+
+      <View style={styles.chatCtaContainer}>
+        <TouchableOpacity 
+          style={styles.chatCtaButton}
+          onPress={() => router.push('/(tabs)/chat')}
+        >
+          <Mascot mood="happy" size={32} />
+          <Text style={styles.chatCtaText}>Chat with Monexa ✨</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -261,113 +243,189 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bg,
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 160,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 24,
     paddingBottom: 24,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   greeting: {
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.inkSoft,
   },
   userName: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+    lineHeight: 28,
+  },
+  notificationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.bgElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: SHADOW.soft,
+      android: { ...SHADOW.soft, elevation: 4 },
+    }),
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.expense,
+    borderWidth: 2,
+    borderColor: COLORS.bgElevated,
   },
   balanceCard: {
     marginHorizontal: 24,
     padding: 24,
-    backgroundColor: '#D32F2F',
-    borderRadius: 16,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.card,
     marginBottom: 24,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: SHADOW.card,
+      android: { ...SHADOW.card, elevation: 8 },
+    }),
+  },
+  balanceCircleTop: {
+    position: 'absolute',
+    top: -96,
+    right: -48,
+    width: 192,
+    height: 192,
+    borderRadius: 96,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  balanceCircleBottom: {
+    position: 'absolute',
+    bottom: -64,
+    left: -48,
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  balanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
   balanceLabel: {
     fontSize: 14,
+    fontFamily: FONTS.bodyMedium,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 8,
+  },
+  currencyBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  currencyText: {
+    fontSize: 10,
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.white,
   },
   balanceAmount: {
-    fontSize: 36,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: 40,
+    fontFamily: FONTS.display,
+    color: COLORS.white,
     marginBottom: 24,
+  },
+  balanceDecimals: {
+    fontSize: 24,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  balanceDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 16,
   },
   balanceDetails: {
     flexDirection: 'row',
-    gap: 32,
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   balanceItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
+  balanceIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  balanceVerticalDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
   balanceItemLabel: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontFamily: FONTS.bodyMedium,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   balanceItemValue: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#D32F2F',
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.white,
   },
   budgetAlertCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     marginHorizontal: 24,
-    marginBottom: 16,
-    padding: 14,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 12,
+    marginBottom: 24,
+    padding: 16,
+    backgroundColor: COLORS.goldSoft,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: COLORS.gold,
   },
   budgetAlertText: {
     flex: 1,
     fontSize: 13,
-    color: '#92400E',
-    fontWeight: '500',
+    fontFamily: FONTS.bodyMedium,
+    color: COLORS.ink,
   },
   section: {
     paddingHorizontal: 24,
@@ -380,17 +438,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 20,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+  },
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   seeAll: {
     fontSize: 14,
-    color: '#D32F2F',
-    fontWeight: '500',
-  },
-  categoriesList: {
-    gap: 12,
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.primary,
   },
   transactionsList: {
     gap: 12,
@@ -400,84 +460,79 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    backgroundColor: COLORS.bgElevated,
+    borderRadius: 20,
+    ...Platform.select({
+      ios: SHADOW.soft,
+      android: { ...SHADOW.soft, elevation: 2 },
+    }),
   },
   transactionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
   transactionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  transactionEmoji: {
+    fontSize: 20,
+  },
   transactionTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1F2937',
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.ink,
   },
   transactionDate: {
     fontSize: 12,
-    color: '#6B7280',
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
     marginTop: 2,
   },
   transactionAmount: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.bodyBold,
   },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyStateMini: {
+    paddingVertical: 20,
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
   },
-  categoryLeft: {
+  emptyStateTextMini: {
+    color: COLORS.inkSoft,
+    fontFamily: FONTS.body,
+  },
+  spacer: {
+    height: 40,
+  },
+  chatCtaContainer: {
+    position: 'absolute',
+    bottom: 24,
+    left: 24,
+    right: 24,
+    zIndex: 50,
+  },
+  chatCtaButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
+    height: 56,
+    backgroundColor: COLORS.primary,
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    ...Platform.select({
+      ios: SHADOW.card,
+      android: { ...SHADOW.card, elevation: 6 },
+    }),
   },
-  categoryName: {
-    fontSize: 16,
-    color: '#1F2937',
-  },
-  categoryAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
-  },
-  emptyStateText: {
+  chatCtaText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  emptyStateButton: {
-    backgroundColor: '#D32F2F',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-  },
-  emptyStateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.white,
   },
 });
