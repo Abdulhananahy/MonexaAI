@@ -16,7 +16,7 @@ import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
-import { formatNumber } from '../utils/format';
+import { formatNumber, getCurrencySymbol } from '../utils/format';
 import { COLORS, FONTS, RADIUS, SHADOW } from '../constants/theme';
 import { Mascot } from '../components/Mascot';
 
@@ -171,10 +171,10 @@ export default function BudgetScreen() {
             <View style={styles.ringTextContainer}>
               <Text style={styles.spentLabel}>Spent</Text>
               <Text style={styles.spentAmount}>
-                {user?.currency || '$'}{formatNumber(spent)}
+                {getCurrencySymbol(user?.currency)}{formatNumber(spent)}
               </Text>
               <Text style={styles.totalLabel}>
-                of {user?.currency || '$'}{formatNumber(budgetLimit)}
+                of {getCurrencySymbol(user?.currency)}{formatNumber(budgetLimit)}
               </Text>
             </View>
           </View>
@@ -189,7 +189,7 @@ export default function BudgetScreen() {
                 styles.summaryValue,
                 { color: remaining < 0 ? COLORS.expense : COLORS.ink }
               ]}>
-                {user?.currency || '$'}{formatNumber(Math.abs(remaining))}{remaining < 0 ? ' over' : ''}
+                {getCurrencySymbol(user?.currency)}{formatNumber(Math.abs(remaining))}{remaining < 0 ? ' over' : ''}
               </Text>
               <Text style={styles.summaryValue}>12 Days</Text>
             </View>
@@ -239,7 +239,7 @@ export default function BudgetScreen() {
               onPress={() => setIsEditing(true)}
             >
               <Text style={styles.displayValue}>
-                {user?.currency || '$'}{formatNumber(budgetLimit)}
+                {getCurrencySymbol(user?.currency)}{formatNumber(budgetLimit)}
               </Text>
               <Feather name="edit-2" size={16} color={COLORS.inkSoft} />
             </TouchableOpacity>

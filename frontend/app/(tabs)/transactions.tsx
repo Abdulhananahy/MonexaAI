@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { formatNumber } from '../../utils/format';
+import { formatNumber, getCurrencySymbol } from '../../utils/format';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { COLORS, RADIUS, SHADOW, FONTS } from '../../constants/theme';
 import { Mascot } from '../../components/Mascot';
@@ -334,7 +334,7 @@ export default function TransactionsScreen() {
                             ]}
                           >
                             {txn.type === 'income' ? '+' : ''}
-                            {user?.currency === 'USD' || !user?.currency ? '$' : ''}
+                            {getCurrencySymbol(user?.currency)}
                             {formatNumber(txn.amount)}
                           </Text>
                           <Ionicons name="chevron-forward" size={16} color={COLORS.inkSoft} style={styles.chevron} />

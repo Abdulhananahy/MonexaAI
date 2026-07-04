@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { formatNumber, formatCurrency } from '../../utils/format';
+import { formatNumber, formatCurrency, getCurrencySymbol } from '../../utils/format';
 import { BarChart, PieChart, LineChart } from 'react-native-gifted-charts';
 import { COLORS, RADIUS, SHADOW, FONTS } from '../../constants/theme';
 import { Mascot } from '../../components/Mascot';
@@ -426,7 +426,7 @@ export default function InsightsScreen() {
             <View style={styles.totalSpentLeft}>
               <Text style={styles.totalSpentLabel}>Total Spent</Text>
               <Text style={styles.totalSpentValue}>
-                {formatCurrency(analytics.total_expense, user?.currency)}
+                {formatCurrency(analytics.total_expense, getCurrencySymbol(user?.currency))}
               </Text>
               <View style={styles.trendBadge}>
                 <Ionicons name="trending-up" size={16} color={COLORS.expense} />
@@ -475,7 +475,7 @@ export default function InsightsScreen() {
               <View key={cat.label} style={styles.barItem}>
                 <View style={styles.barInfo}>
                   <Text style={styles.barLabel}>{cat.label}</Text>
-                  <Text style={styles.barValue}>{formatCurrency(cat.value, user?.currency)}</Text>
+                  <Text style={styles.barValue}>{formatCurrency(cat.value, getCurrencySymbol(user?.currency))}</Text>
                 </View>
                 <View style={styles.barTrack}>
                   <View 

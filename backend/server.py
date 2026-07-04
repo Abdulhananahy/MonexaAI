@@ -207,6 +207,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ============ CURRENCY HELPERS ============
+
+CURRENCY_SYMBOLS = {
+    "USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥", "AUD": "A$", "CAD": "C$",
+    "CHF": "CHF", "CNY": "¥", "INR": "₹", "PKR": "₨", "MXN": "$", "BRL": "R$",
+    "ZAR": "R", "SGD": "S$", "HKD": "HK$", "KRW": "₩", "TRY": "₺", "RUB": "₽",
+    "AED": "AED ", "SAR": "SAR ",
+}
+
+
+def get_currency_symbol(currency_code: Optional[str]) -> str:
+    if not currency_code:
+        return "$"
+    code = currency_code.upper()
+    return CURRENCY_SYMBOLS.get(code, f"{code} ")
+
+
+def fmt_amount(amount: float, currency_code: Optional[str]) -> str:
+    return f"{get_currency_symbol(currency_code)}{amount:,.2f}"
+
 # ============ MODELS ============
 
 class User(BaseModel):
@@ -782,6 +802,8 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
             current_user["id"], request.message
         )
         
+        user_currency = current_user.get("currency", "USD")
+        
         # Check for action commands BEFORE sending to AI
         message_lower = request.message.lower()
         action_performed = False
@@ -829,7 +851,7 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
                     current_user["id"], amount, category, datetime.utcnow().strftime("%Y-%m-%d")
                 )
                 action_performed = True
-                action_response = f"✅ Added ${amount} expense for {category}."
+                action_response = f"✅ Added {fmt_amount(amount, user_currency)} expense for {category}."
         
         # ADD INCOME - detect income keywords OR income categories like salary, freelance, etc.
         elif any(word in message_lower for word in ['earned', 'received', 'got paid', 'income', 'salary', 'freelance', 'bonus', 'investment', 'dividend', 'refund', 'gift']) and 'expense' not in message_lower:
@@ -859,7 +881,7 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
                     current_user["id"], amount, source, datetime.utcnow().strftime("%Y-%m-%d")
                 )
                 action_performed = True
-                action_response = f"✅ Added ${amount} income from {source}."
+                action_response = f"✅ Added {fmt_amount(amount, user_currency)} income from {source}."
         
         # SET BUDGET
         elif any(word in message_lower for word in ['budget', 'limit']):
@@ -870,7 +892,7 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
                 budget = float(amount_match.group(1))
                 await execute("UPDATE users SET monthly_budget = $1 WHERE id = $2::uuid", budget, current_user["id"])
                 action_performed = True
-                action_response = f"✅ Monthly budget set to ${budget}."
+                action_response = f"✅ Monthly budget set to {fmt_amount(budget, user_currency)}."
         
         # CREATE CATEGORY
         elif 'add category' in message_lower or 'new category' in message_lower or 'create category' in message_lower:
@@ -904,7 +926,9 @@ async def chat_with_ai(request: ChatRequest, current_user: dict = Depends(get_cu
             
             simple_context = f"""You are Monexa. An action was just completed: {action_response}
             
-Updated stats: Income ${total_income:.2f}, Expenses ${total_expense:.2f}
+Updated stats: Income {fmt_amount(total_income, user_currency)}, Expenses {fmt_amount(total_expense, user_currency)}
+
+IMPORTANT: The user's currency is {user_currency}. Always use the symbol/prefix "{get_currency_symbol(user_currency)}" for any monetary amount you mention. Never use "$" unless that is actually the user's currency.
 
 Respond with ONE supportive sentence about this action."""
             
@@ -953,14 +977,14 @@ Respond with ONE supportive sentence about this action."""
         # Get recent transactions (last 5)
         recent_transactions = sorted(transactions, key=lambda x: x["date"], reverse=True)[:5]
         recent_trans_text = "\n".join([
-            f"- {t['type'].title()}: ${t['amount']:.2f} for {t['category_name']}{' ('+t.get('income_source', '')+')' if t.get('income_source') else ''} on {t['date'][:10]}" 
+            f"- {t['type'].title()}: {fmt_amount(t['amount'], user_currency)} for {t['category_name']}{' ('+t.get('income_source', '')+')' if t.get('income_source') else ''} on {t['date'][:10]}" 
             for t in recent_transactions
         ]) if recent_transactions else "No recent transactions"
         
         # Top spending categories
         top_categories = sorted(category_spending.items(), key=lambda x: x[1], reverse=True)[:3]
         top_spending_text = "\n".join([
-            f"- {cat}: ${amt:.2f}" for cat, amt in top_categories
+            f"- {cat}: {fmt_amount(amt, user_currency)}" for cat, amt in top_categories
         ]) if top_categories else "No spending yet"
         
         # Available categories for quick reference
@@ -999,7 +1023,7 @@ Respond with ONE supportive sentence about this action."""
 • **Financial Goals**: Let's work together on saving, budgeting, and building better habits
 
 **Current Status:**
-Balance: ${balance:.2f} | Income: ${total_income:.2f} | Expenses: ${total_expense:.2f}
+Balance: {fmt_amount(balance, user_currency)} | Income: {fmt_amount(total_income, user_currency)} | Expenses: {fmt_amount(total_expense, user_currency)}
 
 **Choose Your Chat Style:**
 How should I talk to you?
@@ -1009,8 +1033,8 @@ How should I talk to you?
 • Type **"Friendly"** - Warm and supportive guidance (current)
 
 **Try these commands:**
-- "Add $50 expense for food"
-- "Set monthly budget to $2000"  
+- "Add {get_currency_symbol(user_currency)}50 expense for food"
+- "Set monthly budget to {get_currency_symbol(user_currency)}2000"  
 - "Show my spending this month"
 - "How am I doing?"
 
@@ -1030,9 +1054,9 @@ TONE: {tone.upper()}
 Emoji usage: {current_tone['emoji']}
 
 FINANCIAL DATA FOR {current_user['full_name'].split()[0]}:
-💰 Balance: ${balance:.2f}
-📈 Income: ${total_income:.2f}
-📉 Expenses: ${total_expense:.2f}
+💰 Balance: {fmt_amount(balance, user_currency)}
+📈 Income: {fmt_amount(total_income, user_currency)}
+📉 Expenses: {fmt_amount(total_expense, user_currency)}
 📊 Transactions: {len(transactions)}
 
 RECENT ACTIVITY:
@@ -1046,12 +1070,16 @@ YOUR CAPABILITIES:
 2. Financial advice: Give personalized tips based on their spending
 3. Budget guidance: Help with budgeting and saving strategies
 4. General assistant: Answer questions about spending, restaurants, deals, where to shop, travel tips, etc.
-5. Smart recommendations: If someone asks "find restaurants under $20" or "where to eat cheap", give helpful suggestions
+5. Smart recommendations: If someone asks "find restaurants under {get_currency_symbol(user_currency)}20" or "where to eat cheap", give helpful suggestions
 
 TRANSACTION HANDLING:
 - If user mentions adding money but type is unclear, ask: "Is this income or an expense?"
 - Common expense categories: food, groceries, transport, rent, bills, shopping, entertainment, health, education
 - Common income sources: salary, freelance, bonus, investment, gift, refund
+
+CURRENCY (VERY IMPORTANT):
+- This user's currency is {user_currency}. ALWAYS use "{get_currency_symbol(user_currency)}" as the prefix for every monetary amount you write.
+- NEVER use the "$" sign unless the user's currency is actually USD.
 
 RESPONSE FORMAT:
 - Keep responses concise (2-4 sentences)

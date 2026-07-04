@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import { COLORS, FONTS, RADIUS, SHADOW } from '../constants/theme';
 import { Mascot } from '../components/Mascot';
+import { getCurrencySymbol } from '../utils/format';
 
 const CURRENCIES = [
   'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY', 'INR', 'PKR',
@@ -228,7 +229,7 @@ export default function PreferencesScreen() {
             </View>
             
             <View style={styles.budgetInputWrapper}>
-              <Text style={styles.currencySymbol}>{user?.currency || '$'}</Text>
+              <Text style={styles.currencySymbol}>{getCurrencySymbol(user?.currency)}</Text>
               <TextInput 
                 style={styles.budgetInput}
                 value={monthlyBudget}

@@ -1,3 +1,17 @@
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', JPY: '¥', AUD: 'A$', CAD: 'C$', CHF: 'CHF',
+  CNY: '¥', INR: '₹', PKR: '₨', MXN: '$', BRL: 'R$', ZAR: 'R', SGD: 'S$',
+  HKD: 'HK$', KRW: '₩', TRY: '₺', RUB: '₽', AED: 'AED ', SAR: 'SAR ',
+};
+
+export const getCurrencySymbol = (currencyCode?: string | null): string => {
+  if (!currencyCode) return '$';
+  const code = currencyCode.toUpperCase();
+  const symbol = CURRENCY_SYMBOLS[code];
+  if (symbol) return symbol;
+  return `${code} `;
+};
+
 export const formatNumber = (value: number | string): string => {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return '0';

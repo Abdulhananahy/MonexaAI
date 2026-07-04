@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
-import { formatNumber } from '../../utils/format';
+import { formatNumber, getCurrencySymbol } from '../../utils/format';
 import { useCallback } from 'react';
 import { COLORS, RADIUS, SHADOW, FONTS } from '../../constants/theme';
 import { Mascot } from '../../components/Mascot';
@@ -127,7 +127,7 @@ export default function HomeScreen() {
           </View>
 
           <Text style={styles.balanceAmount}>
-            {user?.currency === 'USD' || !user?.currency ? '$' : user.currency + ' '}
+            {getCurrencySymbol(user?.currency)}
             {balanceParts[0]}
             {balanceParts[1] && <Text style={styles.balanceDecimals}>.{balanceParts[1]}</Text>}
           </Text>
@@ -142,7 +142,7 @@ export default function HomeScreen() {
               <View>
                 <Text style={styles.balanceItemLabel}>Income</Text>
                 <Text style={styles.balanceItemValue}>
-                  {user?.currency === 'USD' || !user?.currency ? '$' : ''}
+                  {getCurrencySymbol(user?.currency)}
                   {formatNumber(summary?.total_income || 0)}
                 </Text>
               </View>
@@ -155,7 +155,7 @@ export default function HomeScreen() {
               <View>
                 <Text style={styles.balanceItemLabel}>Expenses</Text>
                 <Text style={styles.balanceItemValue}>
-                  {user?.currency === 'USD' || !user?.currency ? '$' : ''}
+                  {getCurrencySymbol(user?.currency)}
                   {formatNumber(summary?.total_expense || 0)}
                 </Text>
               </View>
@@ -171,7 +171,7 @@ export default function HomeScreen() {
             <Ionicons name="warning" size={20} color={COLORS.expense} />
             <Text style={styles.budgetAlertText}>
               You've used {summary.budget_percent_used}% of your monthly budget
-              {summary.monthly_budget ? ` (${user?.currency || 'USD'} ${formatNumber(summary.monthly_budget)})` : ''}.
+              {summary.monthly_budget ? ` (${getCurrencySymbol(user?.currency)}${formatNumber(summary.monthly_budget)})` : ''}.
             </Text>
           </TouchableOpacity>
         )}
@@ -211,7 +211,7 @@ export default function HomeScreen() {
                   </View>
                   <Text style={[styles.transactionAmount, { color: tx.type === 'income' ? COLORS.income : COLORS.ink }]}>
                     {tx.type === 'income' ? '+' : ''}
-                    {user?.currency === 'USD' || !user?.currency ? '$' : ''}
+                    {getCurrencySymbol(user?.currency)}
                     {formatNumber(tx.amount)}
                   </Text>
                 </TouchableOpacity>
