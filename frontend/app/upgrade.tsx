@@ -223,8 +223,10 @@ export default function UpgradeScreen() {
                   <Text style={styles.tierDescription}>{tier.description}</Text>
                 </View>
                 <View style={styles.priceContainer}>
-                  <Text style={styles.price}>{tier.price}</Text>
-                  {tier.period && <Text style={styles.period}>{tier.period}</Text>}
+                  <View style={styles.priceRow}>
+                    <Text style={styles.price}>{tier.price}</Text>
+                    {tier.period && <Text style={styles.period}>{tier.period}</Text>}
+                  </View>
                   {priceSubtext(tier.id) && (
                     <Text style={styles.priceSubtext}>{priceSubtext(tier.id)}</Text>
                   )}
@@ -425,6 +427,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   priceContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+  },
+  priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
@@ -442,7 +448,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: FONTS.body,
     color: COLORS.inkSoft,
-    width: '100%',
     textAlign: 'right',
     marginTop: 2,
   },

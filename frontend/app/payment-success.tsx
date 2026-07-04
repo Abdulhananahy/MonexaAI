@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -40,7 +40,10 @@ export default function PaymentSuccessScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.mascotContainer}>
           <Mascot mood="happy" size={160} />
         </View>
@@ -102,7 +105,7 @@ export default function PaymentSuccessScreen() {
         >
           <Text style={styles.secondaryButtonText}>View My Subscription</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -113,10 +116,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingVertical: 24,
   },
   checkingRow: {
     flexDirection: 'row',
