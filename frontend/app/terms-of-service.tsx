@@ -1,7 +1,8 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import { COLORS, FONTS, RADIUS, SHADOW } from '../constants/theme';
 
 export default function TermsOfServiceScreen() {
   const router = useRouter();
@@ -9,14 +10,17 @@ export default function TermsOfServiceScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Feather name="chevron-left" size={24} color={COLORS.ink} />
         </TouchableOpacity>
         <Text style={styles.title}>Terms of Service</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.updated}>Last updated: July 2026</Text>
 
         <Text style={styles.heading}>1. Acceptance of Terms</Text>
@@ -74,13 +78,17 @@ export default function TermsOfServiceScreen() {
         <Text style={styles.footer}>
           Questions about these terms? Reach us via the Help & Support screen.
         </Text>
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.bg 
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -88,13 +96,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  title: { fontSize: 20, fontWeight: '600', color: '#1F2937' },
-  content: { flex: 1, padding: 24 },
-  updated: { fontSize: 12, color: '#9CA3AF', marginBottom: 20 },
-  heading: { fontSize: 16, fontWeight: '600', color: '#1F2937', marginTop: 16, marginBottom: 8 },
-  body: { fontSize: 14, lineHeight: 21, color: '#4B5563' },
-  footer: { fontSize: 13, color: '#6B7280', marginTop: 24, marginBottom: 40, fontStyle: 'italic' },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOW.soft,
+  },
+  title: { 
+    fontSize: 20, 
+    fontFamily: FONTS.display, 
+    color: COLORS.ink 
+  },
+  content: { 
+    flex: 1, 
+    paddingHorizontal: 24 
+  },
+  updated: { 
+    fontSize: 12, 
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft, 
+    marginBottom: 20 
+  },
+  heading: { 
+    fontSize: 18, 
+    fontFamily: FONTS.display, 
+    color: COLORS.ink, 
+    marginTop: 24, 
+    marginBottom: 8 
+  },
+  body: { 
+    fontSize: 15, 
+    lineHeight: 22, 
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft 
+  },
+  footer: { 
+    fontSize: 14, 
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
+    marginTop: 24,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
 });

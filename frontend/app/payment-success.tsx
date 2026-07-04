@@ -2,21 +2,22 @@ import { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import { COLORS, FONTS, RADIUS, SHADOW } from '../constants/theme';
+import { Mascot } from '../components/Mascot';
 
 export default function PaymentSuccessScreen() {
   const router = useRouter();
 
   useEffect(() => {
     // Optional: Refresh user subscription status
-    // You could call an API here to sync the subscription
   }, []);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="checkmark-circle" size={80} color="#10B981" />
+        <View style={styles.mascotContainer}>
+          <Mascot mood="happy" size={160} />
         </View>
         
         <Text style={styles.title}>Payment Successful!</Text>
@@ -28,19 +29,27 @@ export default function PaymentSuccessScreen() {
           <Text style={styles.featuresTitle}>You now have access to:</Text>
           <View style={styles.featuresList}>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+              <View style={[styles.checkIcon, { backgroundColor: COLORS.incomeSoft }]}>
+                <Feather name="check" size={16} color={COLORS.income} />
+              </View>
               <Text style={styles.featureText}>Unlimited AI Messages</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+              <View style={[styles.checkIcon, { backgroundColor: COLORS.incomeSoft }]}>
+                <Feather name="check" size={16} color={COLORS.income} />
+              </View>
               <Text style={styles.featureText}>Advanced Analytics</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+              <View style={[styles.checkIcon, { backgroundColor: COLORS.incomeSoft }]}>
+                <Feather name="check" size={16} color={COLORS.income} />
+              </View>
               <Text style={styles.featureText}>Priority Support</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+              <View style={[styles.checkIcon, { backgroundColor: COLORS.incomeSoft }]}>
+                <Feather name="check" size={16} color={COLORS.income} />
+              </View>
               <Text style={styles.featureText}>CSV Export</Text>
             </View>
           </View>
@@ -67,7 +76,7 @@ export default function PaymentSuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bg,
   },
   content: {
     flex: 1,
@@ -75,71 +84,79 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  iconContainer: {
+  mascotContainer: {
     marginBottom: 24,
   },
   title: {
     fontSize: 28,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 24,
   },
   featuresBox: {
     width: '100%',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
     padding: 24,
     marginBottom: 32,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    ...SHADOW.soft,
   },
   featuresTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 18,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
     marginBottom: 16,
   },
   featuresList: {
-    gap: 12,
+    gap: 14,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
+  checkIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   featureText: {
-    fontSize: 14,
-    color: '#1F2937',
+    fontSize: 15,
+    fontFamily: FONTS.body,
+    color: COLORS.ink,
   },
   button: {
     width: '100%',
-    backgroundColor: '#D32F2F',
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.chip,
     paddingVertical: 16,
-    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
+    ...SHADOW.soft,
   },
   buttonText: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.display,
+    color: COLORS.white,
   },
   secondaryButton: {
-    width: '100%',
-    paddingVertical: 16,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#D32F2F',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
   },
 });

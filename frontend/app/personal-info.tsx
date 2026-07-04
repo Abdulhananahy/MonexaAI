@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { COLORS, FONTS, RADIUS, SHADOW } from '../constants/theme';
+import { Mascot } from '../components/Mascot';
 
 export default function PersonalInfoScreen() {
   const { user, refreshUser } = useAuth();
@@ -81,61 +83,63 @@ export default function PersonalInfoScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.ink} />
         </TouchableOpacity>
-        <Text style={styles.title}>Personal Information</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.title}>Personal Info</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user?.full_name?.charAt(0).toUpperCase()}
-            </Text>
+          <View style={styles.avatarContainer}>
+            <View style={styles.mascotCircle}>
+              <Mascot mood="happy" size={80} />
+            </View>
           </View>
           <TouchableOpacity style={styles.changeAvatarButton}>
-            <Ionicons name="camera" size={20} color="#D32F2F" />
+            <Ionicons name="camera" size={20} color={COLORS.primary} />
             <Text style={styles.changeAvatarText}>Change Photo</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basic Information</Text>
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-              style={styles.input}
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Enter your full name"
-            />
-          </View>
+          <View style={styles.card}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Full Name</Text>
+              <TextInput
+                style={styles.input}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Enter your full name"
+                placeholderTextColor={COLORS.inkSoft}
+              />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email Address</Text>
-            <TextInput
-              style={[styles.input, styles.inputDisabled]}
-              value={email}
-              editable={false}
-            />
-            <Text style={styles.helperText}>
-              Email cannot be changed
-            </Text>
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email Address</Text>
+              <TextInput
+                style={[styles.input, styles.inputDisabled]}
+                value={email}
+                editable={false}
+              />
+              <Text style={styles.helperText}>
+                Email cannot be changed
+              </Text>
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Member Since</Text>
-            <TextInput
-              style={[styles.input, styles.inputDisabled]}
-              value={new Date().toLocaleDateString('en-US', { 
-                month: 'long', 
-                year: 'numeric' 
-              })}
-              editable={false}
-            />
+            <View style={[styles.inputContainer, { marginBottom: 0 }]}>
+              <Text style={styles.label}>Member Since</Text>
+              <TextInput
+                style={[styles.input, styles.inputDisabled]}
+                value={new Date().toLocaleDateString('en-US', { 
+                  month: 'long', 
+                  year: 'numeric' 
+                })}
+                editable={false}
+              />
+            </View>
           </View>
         </View>
 
@@ -144,16 +148,16 @@ export default function PersonalInfoScreen() {
             style={styles.passwordToggle}
             onPress={() => setShowPasswordSection(!showPasswordSection)}
           >
-            <Text style={styles.sectionTitle}>Change Password</Text>
+            <Text style={styles.sectionTitle}>Security</Text>
             <Ionicons
               name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
               size={20}
-              color="#6B7280"
+              color={COLORS.inkSoft}
             />
           </TouchableOpacity>
 
           {showPasswordSection && (
-            <>
+            <View style={styles.card}>
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Current Password</Text>
                 <TextInput
@@ -161,6 +165,7 @@ export default function PersonalInfoScreen() {
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   placeholder="Enter current password"
+                  placeholderTextColor={COLORS.inkSoft}
                   secureTextEntry
                   autoCapitalize="none"
                 />
@@ -173,6 +178,7 @@ export default function PersonalInfoScreen() {
                   value={newPassword}
                   onChangeText={setNewPassword}
                   placeholder="Enter new password"
+                  placeholderTextColor={COLORS.inkSoft}
                   secureTextEntry
                   autoCapitalize="none"
                 />
@@ -185,6 +191,7 @@ export default function PersonalInfoScreen() {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm new password"
+                  placeholderTextColor={COLORS.inkSoft}
                   secureTextEntry
                   autoCapitalize="none"
                 />
@@ -196,14 +203,14 @@ export default function PersonalInfoScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color={COLORS.white} />
                 ) : (
                   <Text style={styles.changePasswordButtonText}>
                     Update Password
                   </Text>
                 )}
               </TouchableOpacity>
-            </>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -215,7 +222,7 @@ export default function PersonalInfoScreen() {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={COLORS.white} />
           ) : (
             <Text style={styles.saveButtonText}>Save Changes</Text>
           )}
@@ -228,45 +235,55 @@ export default function PersonalInfoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 24,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOW.soft,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 24,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
   },
   content: {
     flex: 1,
   },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
   avatarSection: {
     alignItems: 'center',
     paddingVertical: 32,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  avatar: {
+  avatarContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#D32F2F',
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 4,
+    borderColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+    ...SHADOW.soft,
   },
-  avatarText: {
-    fontSize: 40,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  mascotCircle: {
+    marginTop: 8,
   },
   changeAvatarButton: {
     flexDirection: 'row',
@@ -275,83 +292,97 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: COLORS.white,
+    ...SHADOW.soft,
   },
   changeAvatarText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#D32F2F',
+    fontFamily: FONTS.bodyBold,
+    color: COLORS.primary,
   },
   section: {
-    padding: 24,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 16,
+    fontSize: 20,
+    fontFamily: FONTS.display,
+    color: COLORS.ink,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    padding: 20,
+    ...SHADOW.soft,
   },
   passwordToggle: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   inputContainer: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
+    fontFamily: FONTS.bodySemi,
+    color: COLORS.ink,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderColor: COLORS.border,
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#1F2937',
+    fontFamily: FONTS.body,
+    color: COLORS.ink,
+    backgroundColor: COLORS.bg,
   },
   inputDisabled: {
     backgroundColor: '#F9FAFB',
-    color: '#6B7280',
+    color: COLORS.inkSoft,
+    borderColor: '#F3F4F6',
   },
   helperText: {
     fontSize: 12,
-    color: '#6B7280',
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
     marginTop: 4,
+    marginLeft: 4,
   },
   changePasswordButton: {
-    backgroundColor: '#D32F2F',
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
+    ...SHADOW.soft,
   },
   changePasswordButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: 16,
+    fontFamily: FONTS.bodyBold,
   },
   footer: {
     padding: 24,
+    backgroundColor: COLORS.white,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: COLORS.border,
   },
   saveButton: {
-    backgroundColor: '#D32F2F',
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: RADIUS.button,
     alignItems: 'center',
+    ...SHADOW.soft,
   },
   saveButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.bodyBold,
   },
 });

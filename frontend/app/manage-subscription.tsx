@@ -13,6 +13,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
+import { COLORS, FONTS, RADIUS, SHADOW } from '../constants/theme';
 
 interface SubscriptionInfo {
   plan_type: string;
@@ -98,7 +99,7 @@ export default function ManageSubscriptionScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#D32F2F" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
@@ -108,14 +109,14 @@ export default function ManageSubscriptionScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.ink} />
         </TouchableOpacity>
-        <Text style={styles.title}>Manage Subscription</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.title}>Subscription</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.planCard}>
           <Text style={styles.planLabel}>Current Plan</Text>
           <Text style={styles.planName}>
@@ -135,7 +136,9 @@ export default function ManageSubscriptionScreen() {
         <View style={styles.featuresCard}>
           <Text style={styles.sectionTitle}>Your Features</Text>
           <View style={styles.featureRow}>
-            <Ionicons name="chatbubbles-outline" size={20} color="#6B7280" />
+            <View style={[styles.featureIcon, { backgroundColor: COLORS.primarySoft }]}>
+              <Ionicons name="chatbubbles-outline" size={20} color={COLORS.primary} />
+            </View>
             <Text style={styles.featureText}>
               {subscription?.limits.ai_messages_per_day === -1
                 ? 'Unlimited AI messages'
@@ -143,19 +146,25 @@ export default function ManageSubscriptionScreen() {
             </Text>
           </View>
           <View style={styles.featureRow}>
-            <Ionicons name="stats-chart-outline" size={20} color="#6B7280" />
+            <View style={[styles.featureIcon, { backgroundColor: COLORS.incomeSoft }]}>
+              <Ionicons name="stats-chart-outline" size={20} color={COLORS.income} />
+            </View>
             <Text style={styles.featureText}>
               {subscription?.limits.charts_enabled ? 'Charts enabled' : 'Charts locked'}
             </Text>
           </View>
           <View style={styles.featureRow}>
-            <Ionicons name="download-outline" size={20} color="#6B7280" />
+            <View style={[styles.featureIcon, { backgroundColor: COLORS.goldSoft }]}>
+              <Ionicons name="download-outline" size={20} color={COLORS.gold} />
+            </View>
             <Text style={styles.featureText}>
               {subscription?.limits.export_enabled ? 'CSV export enabled' : 'CSV export locked'}
             </Text>
           </View>
           <View style={styles.featureRow}>
-            <Ionicons name="time-outline" size={20} color="#6B7280" />
+            <View style={[styles.featureIcon, { backgroundColor: COLORS.primarySoft }]}>
+              <Ionicons name="time-outline" size={20} color={COLORS.primary} />
+            </View>
             <Text style={styles.featureText}>
               {subscription?.limits.history_days === -1
                 ? 'Unlimited history'
@@ -164,101 +173,121 @@ export default function ManageSubscriptionScreen() {
           </View>
         </View>
 
-        {!isPaid ? (
-          <TouchableOpacity style={styles.upgradeButton} onPress={() => router.push('/upgrade' as any)}>
-            <Ionicons name="star" size={18} color="#FFFFFF" />
-            <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-          </TouchableOpacity>
-        ) : (
-          <>
+        <View style={styles.buttonContainer}>
+          {!isPaid ? (
             <TouchableOpacity style={styles.upgradeButton} onPress={() => router.push('/upgrade' as any)}>
-              <Ionicons name="swap-horizontal" size={18} color="#FFFFFF" />
-              <Text style={styles.upgradeButtonText}>Change Plan</Text>
+              <Ionicons name="star" size={18} color={COLORS.white} />
+              <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
-              disabled={cancelling}
-            >
-              {cancelling ? (
-                <ActivityIndicator color="#EF4444" />
-              ) : (
-                <>
-                  <Ionicons name="close-circle-outline" size={18} color="#EF4444" />
-                  <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </>
-        )}
+          ) : (
+            <>
+              <TouchableOpacity style={styles.upgradeButton} onPress={() => router.push('/upgrade' as any)}>
+                <Ionicons name="swap-horizontal" size={18} color={COLORS.white} />
+                <Text style={styles.upgradeButtonText}>Change Plan</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancel}
+                disabled={cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator color={COLORS.expense} />
+                ) : (
+                  <>
+                    <Ionicons name="close-circle-outline" size={18} color={COLORS.expense} />
+                    <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: COLORS.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 24,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  title: { fontSize: 20, fontWeight: '600', color: '#1F2937' },
-  content: { flex: 1, padding: 24 },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOW.soft,
+  },
+  title: { fontSize: 24, fontFamily: FONTS.display, color: COLORS.ink },
+  content: { flex: 1 },
+  scrollContent: { padding: 24 },
   planCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    padding: 24,
+    marginBottom: 24,
+    ...SHADOW.soft,
   },
-  planLabel: { fontSize: 13, color: '#6B7280', marginBottom: 4 },
-  planName: { fontSize: 24, fontWeight: '700', color: '#1F2937', marginBottom: 12 },
+  planLabel: { fontSize: 14, fontFamily: FONTS.bodyMedium, color: COLORS.inkSoft, marginBottom: 4 },
+  planName: { fontSize: 28, fontFamily: FONTS.display, color: COLORS.ink, marginBottom: 12 },
   statusBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 12,
   },
-  statusActive: { backgroundColor: '#D1FAE5' },
-  statusInactive: { backgroundColor: '#FEE2E2' },
-  statusText: { fontSize: 11, fontWeight: '700', color: '#1F2937' },
-  dateText: { fontSize: 13, color: '#6B7280' },
+  statusActive: { backgroundColor: COLORS.incomeSoft },
+  statusInactive: { backgroundColor: COLORS.expenseSoft },
+  statusText: { fontSize: 12, fontFamily: FONTS.bodyBold, color: COLORS.ink },
+  dateText: { fontSize: 14, fontFamily: FONTS.body, color: COLORS.inkSoft },
   featuresCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    padding: 24,
     marginBottom: 24,
+    ...SHADOW.soft,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937', marginBottom: 12 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  featureText: { fontSize: 14, color: '#374151' },
+  sectionTitle: { fontSize: 20, fontFamily: FONTS.display, color: COLORS.ink, marginBottom: 20 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
+  featureIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureText: { fontSize: 15, fontFamily: FONTS.bodyMedium, color: COLORS.ink },
+  buttonContainer: { gap: 12, marginBottom: 40 },
   upgradeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#D32F2F',
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: RADIUS.button,
+    ...SHADOW.soft,
   },
-  upgradeButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  upgradeButtonText: { color: COLORS.white, fontSize: 16, fontFamily: FONTS.bodyBold },
   cancelButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: RADIUS.button,
     borderWidth: 1,
-    borderColor: '#FEE2E2',
-    marginBottom: 32,
+    borderColor: COLORS.expenseSoft,
+    backgroundColor: COLORS.white,
   },
-  cancelButtonText: { color: '#EF4444', fontSize: 16, fontWeight: '600' },
+  cancelButtonText: { color: COLORS.expense, fontSize: 16, fontFamily: FONTS.bodyBold },
 });

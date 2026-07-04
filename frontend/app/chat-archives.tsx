@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
+import { COLORS, FONTS, RADIUS, SHADOW } from '../constants/theme';
 
 interface ArchiveSummary {
   id: string;
@@ -83,18 +84,20 @@ export default function ChatArchivesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.ink} />
         </TouchableOpacity>
         <Text style={styles.title}>Chat Archives</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 40 }} />
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#D32F2F" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
       ) : archives.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="archive-outline" size={48} color="#D1D5DB" />
+          <View style={styles.emptyIconContainer}>
+            <Ionicons name="archive-outline" size={64} color={COLORS.primarySoft} />
+          </View>
           <Text style={styles.emptyText}>No archived conversations yet</Text>
           <Text style={styles.emptySubtext}>
             Archive a conversation from the chat menu to see it here.
@@ -105,10 +108,11 @@ export default function ChatArchivesScreen() {
           data={archives}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.archiveCard} onPress={() => openArchive(item.id)}>
-              <View style={styles.archiveIcon}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#D32F2F" />
+              <View style={[styles.archiveIcon, { backgroundColor: COLORS.primarySoft }]}>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={COLORS.primary} />
               </View>
               <View style={styles.archiveInfo}>
                 <Text style={styles.archivePreview} numberOfLines={1}>{item.preview}</Text>
@@ -117,7 +121,7 @@ export default function ChatArchivesScreen() {
                 </Text>
               </View>
               <TouchableOpacity onPress={() => deleteArchive(item.id)} style={styles.deleteBtn}>
-                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                <Ionicons name="trash-outline" size={18} color={COLORS.expense} />
               </TouchableOpacity>
             </TouchableOpacity>
           )}
@@ -127,19 +131,20 @@ export default function ChatArchivesScreen() {
       <Modal visible={viewingArchive !== null || viewingLoading} animationType="slide">
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => setViewingArchive(null)}>
-              <Ionicons name="arrow-back" size={24} color="#1F2937" />
+            <TouchableOpacity style={styles.backButton} onPress={() => setViewingArchive(null)}>
+              <Ionicons name="close" size={24} color={COLORS.ink} />
             </TouchableOpacity>
             <Text style={styles.title}>Archived Chat</Text>
-            <View style={{ width: 24 }} />
+            <View style={{ width: 40 }} />
           </View>
           {viewingLoading ? (
-            <ActivityIndicator size="large" color="#D32F2F" style={{ marginTop: 40 }} />
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
           ) : (
             <FlatList
               data={viewingArchive || []}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <View
                   style={[
@@ -161,46 +166,63 @@ export default function ChatArchivesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: COLORS.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 24,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  title: { fontSize: 20, fontWeight: '600', color: '#1F2937' },
-  list: { padding: 24 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: '#374151', marginTop: 16 },
-  emptySubtext: { fontSize: 13, color: '#9CA3AF', marginTop: 8, textAlign: 'center' },
-  archiveCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    gap: 12,
-  },
-  archiveIcon: {
+  backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOW.soft,
+  },
+  title: { fontSize: 24, fontFamily: FONTS.display, color: COLORS.ink },
+  list: { padding: 24 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    ...SHADOW.soft,
+  },
+  emptyText: { fontSize: 20, fontFamily: FONTS.display, color: COLORS.ink, marginTop: 16 },
+  emptySubtext: { fontSize: 14, fontFamily: FONTS.body, color: COLORS.inkSoft, marginTop: 8, textAlign: 'center' },
+  archiveCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
+    ...SHADOW.soft,
+  },
+  archiveIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   archiveInfo: { flex: 1 },
-  archivePreview: { fontSize: 14, fontWeight: '500', color: '#1F2937' },
-  archiveMeta: { fontSize: 12, color: '#9CA3AF', marginTop: 4 },
-  deleteBtn: { padding: 8 },
-  messageBubble: { padding: 12, borderRadius: 12, marginBottom: 12, maxWidth: '85%' },
-  userBubble: { backgroundColor: '#D32F2F', alignSelf: 'flex-end' },
-  assistantBubble: { backgroundColor: '#F3F4F6', alignSelf: 'flex-start' },
-  userText: { color: '#FFFFFF', fontSize: 14 },
-  assistantText: { color: '#1F2937', fontSize: 14 },
+  archivePreview: { fontSize: 16, fontFamily: FONTS.bodyBold, color: COLORS.ink },
+  archiveMeta: { fontSize: 12, fontFamily: FONTS.body, color: COLORS.inkSoft, marginTop: 4 },
+  deleteBtn: { padding: 8, backgroundColor: COLORS.expenseSoft, borderRadius: 12 },
+  messageBubble: { padding: 16, borderRadius: 20, marginBottom: 12, maxWidth: '85%', ...SHADOW.soft },
+  userBubble: { backgroundColor: COLORS.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
+  assistantBubble: { backgroundColor: COLORS.white, alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
+  userText: { color: COLORS.white, fontSize: 15, fontFamily: FONTS.body },
+  assistantText: { color: COLORS.ink, fontSize: 15, fontFamily: FONTS.body },
 });
