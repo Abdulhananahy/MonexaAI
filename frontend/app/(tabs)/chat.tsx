@@ -99,8 +99,8 @@ export default function ChatScreen() {
   };
 
   const handleViewArchives = () => {
-    Alert.alert('Coming Soon', 'Archive viewing will be available in the next update!');
     setShowMenu(false);
+    router.push('/chat-archives' as any);
   };
 
   const handleClearChat = () => {

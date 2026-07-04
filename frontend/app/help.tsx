@@ -4,6 +4,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -58,11 +59,11 @@ export default function HelpScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Legal</Text>
-          <TouchableOpacity style={styles.linkItem}>
+          <TouchableOpacity style={styles.linkItem} onPress={() => router.push('/privacy-policy' as any)}>
             <Text style={styles.linkText}>Privacy Policy</Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.linkItem}>
+          <TouchableOpacity style={styles.linkItem} onPress={() => router.push('/terms-of-service' as any)}>
             <Text style={styles.linkText}>Terms of Service</Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
@@ -70,12 +71,16 @@ export default function HelpScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Us</Text>
-          <TouchableOpacity style={styles.contactCard}>
+          <TouchableOpacity
+            style={styles.contactCard}
+            onPress={() => Linking.openURL('mailto:support@monexa.app?subject=Monexa%20Support%20Request')}
+          >
             <Ionicons name="mail" size={24} color="#D32F2F" />
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Email Support</Text>
               <Text style={styles.contactValue}>support@monexa.app</Text>
             </View>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
       </ScrollView>

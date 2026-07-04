@@ -64,7 +64,13 @@ export default function ProfileScreen() {
       icon: 'notifications-outline',
       title: 'Notifications',
       subtitle: 'Manage alerts',
-      onPress: () => {},
+      onPress: () => router.push('/notifications' as any),
+    },
+    {
+      icon: 'card-outline',
+      title: 'Manage Subscription',
+      subtitle: 'Plan, billing, cancel',
+      onPress: () => router.push('/manage-subscription' as any),
     },
     {
       icon: 'star-outline',

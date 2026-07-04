@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Query
+from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -245,10 +245,16 @@ class UserProfile(BaseModel):
     email: str
     currency: str
     monthly_budget: Optional[float] = None
+    budget_alert_threshold: int = 80
+    notify_budget_alerts: bool = True
+    notify_ai_insights: bool = True
 
 class UserPreferences(BaseModel):
     currency: Optional[str] = None
     monthly_budget: Optional[float] = None
+    budget_alert_threshold: Optional[int] = None
+    notify_budget_alerts: Optional[bool] = None
+    notify_ai_insights: Optional[bool] = None
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -591,6 +597,51 @@ async def update_transaction(transaction_id: str, transaction: TransactionCreate
     
     updated = await db.transactions.find_one({"_id": ObjectId(transaction_id)})
     return serialize_mongo_doc(updated)
+
+@api_router.get("/transactions/export")
+async def export_transactions_csv(current_user: dict = Depends(get_current_user)):
+    """Export all user transactions as CSV. Requires export_enabled entitlement (Pro plan)."""
+    subscription = await db.subscriptions.find_one({
+        "user_id": current_user["id"],
+        "status": "active"
+    })
+    plan_type = subscription.get("plan_type", "free") if subscription else "free"
+    limits = get_subscription_limits(plan_type)
+
+    if not limits.get("export_enabled"):
+        raise HTTPException(
+            status_code=403,
+            detail="CSV export is a Pro feature. Upgrade your plan to export transactions."
+        )
+
+    transactions = await db.transactions.find({"user_id": current_user["id"]}).sort("date", -1).to_list(10000)
+
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Type", "Category", "Income Source", "Amount", "Currency", "Note"])
+    currency = current_user.get("currency", "USD")
+    for t in transactions:
+        writer.writerow([
+            t.get("date", ""),
+            t.get("type", ""),
+            t.get("category_name", ""),
+            t.get("income_source", "") or "",
+            t.get("amount", 0),
+            currency,
+            (t.get("note", "") or "").replace("\n", " ")
+        ])
+
+    output.seek(0)
+    filename = f"monexa_transactions_{datetime.utcnow().strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @api_router.delete("/transactions/{transaction_id}")
 async def delete_transaction(transaction_id: str, current_user: dict = Depends(get_current_user)):
@@ -1151,13 +1202,34 @@ async def get_analytics_summary(current_user: dict = Depends(get_current_user)):
     
     # Sort categories by total spending
     top_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # Budget alert calculation (current calendar month spend vs monthly_budget)
+    monthly_budget = current_user.get("monthly_budget")
+    alert_threshold = current_user.get("budget_alert_threshold", 80)
+    notify_budget_alerts = current_user.get("notify_budget_alerts", True)
+    now = datetime.utcnow()
+    month_start_str = now.strftime("%Y-%m-01")
+    current_month_expense = sum(
+        t["amount"] for t in transactions
+        if t["type"] == "expense" and isinstance(t.get("date"), str) and t["date"] >= month_start_str
+    )
+    budget_percent_used = None
+    budget_alert = False
+    if monthly_budget and monthly_budget > 0:
+        budget_percent_used = round((current_month_expense / monthly_budget) * 100, 1)
+        budget_alert = notify_budget_alerts and budget_percent_used >= alert_threshold
     
     return {
         "balance": balance,
         "total_income": total_income,
         "total_expense": total_expense,
         "top_spending_categories": [{"name": cat, "amount": amt} for cat, amt in top_categories],
-        "transaction_count": len(transactions)
+        "transaction_count": len(transactions),
+        "monthly_budget": monthly_budget,
+        "current_month_expense": current_month_expense,
+        "budget_percent_used": budget_percent_used,
+        "budget_alert": budget_alert,
+        "budget_alert_threshold": alert_threshold
     }
 
 @api_router.get("/analytics/insights")
@@ -1223,7 +1295,10 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
         "full_name": current_user["full_name"],
         "email": current_user["email"],
         "currency": current_user.get("currency", "USD"),
-        "monthly_budget": current_user.get("monthly_budget")
+        "monthly_budget": current_user.get("monthly_budget"),
+        "budget_alert_threshold": current_user.get("budget_alert_threshold", 80),
+        "notify_budget_alerts": current_user.get("notify_budget_alerts", True),
+        "notify_ai_insights": current_user.get("notify_ai_insights", True)
     }
 
 @api_router.put("/profile/preferences")
@@ -1243,6 +1318,15 @@ async def update_preferences(preferences: UserPreferences, current_user: dict = 
     
     if preferences.monthly_budget is not None:
         update_data["monthly_budget"] = preferences.monthly_budget
+
+    if preferences.budget_alert_threshold is not None:
+        update_data["budget_alert_threshold"] = max(1, min(100, preferences.budget_alert_threshold))
+
+    if preferences.notify_budget_alerts is not None:
+        update_data["notify_budget_alerts"] = preferences.notify_budget_alerts
+
+    if preferences.notify_ai_insights is not None:
+        update_data["notify_ai_insights"] = preferences.notify_ai_insights
     
     if update_data:
         await db.users.update_one(
@@ -1251,6 +1335,96 @@ async def update_preferences(preferences: UserPreferences, current_user: dict = 
         )
     
     return {"message": "Preferences updated successfully", "converted": bool(preferences.currency)}
+
+# ============ STRIPE WEBHOOK ============
+
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET')
+
+async def _sync_subscription_from_stripe_id(stripe_subscription_id: str, status_override: Optional[str] = None):
+    """Sync local subscription record status based on a Stripe subscription id."""
+    local_sub = await db.subscriptions.find_one({"stripe_subscription_id": stripe_subscription_id})
+    if not local_sub:
+        logger.warning(f"Webhook: no local subscription found for Stripe id {stripe_subscription_id}")
+        return
+
+    new_status = status_override
+    if not new_status:
+        try:
+            stripe_sub = stripe.Subscription.retrieve(stripe_subscription_id)
+            stripe_status = stripe_sub.status  # active, past_due, canceled, unpaid, incomplete_expired...
+            if stripe_status == "active":
+                new_status = "active"
+            elif stripe_status in ("canceled", "incomplete_expired"):
+                new_status = "cancelled"
+            elif stripe_status in ("past_due", "unpaid"):
+                new_status = "past_due"
+            else:
+                new_status = stripe_status
+        except Exception as e:
+            logger.error(f"Webhook: failed to retrieve Stripe subscription {stripe_subscription_id}: {e}")
+            return
+
+    update_fields = {"status": new_status}
+    if new_status in ("cancelled", "past_due"):
+        update_fields["end_date"] = datetime.utcnow()
+
+    await db.subscriptions.update_one(
+        {"_id": local_sub["_id"]},
+        {"$set": update_fields}
+    )
+    logger.info(f"Webhook: synced subscription {stripe_subscription_id} -> status={new_status}")
+
+@api_router.post("/webhooks/stripe")
+async def stripe_webhook(request: Request):
+    """Receive Stripe webhook events to keep subscription status in sync with Stripe.
+    Configure this endpoint's public URL in the Stripe Dashboard and set STRIPE_WEBHOOK_SECRET
+    to the signing secret Stripe gives you, so payloads can be verified.
+    """
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    event = None
+    if STRIPE_WEBHOOK_SECRET and sig_header:
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        except (ValueError, stripe.error.SignatureVerificationError) as e:
+            logger.error(f"Stripe webhook signature verification failed: {e}")
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+    else:
+        # No webhook secret configured yet - accept unverified payload so the endpoint
+        # is functional out of the box, but this should be locked down before going live.
+        logger.warning("STRIPE_WEBHOOK_SECRET not set - processing Stripe webhook without signature verification")
+        try:
+            import json
+            event = json.loads(payload)
+        except Exception as e:
+            logger.error(f"Failed to parse Stripe webhook payload: {e}")
+            raise HTTPException(status_code=400, detail="Invalid payload")
+
+    event_type = event.get("type") if isinstance(event, dict) else event["type"]
+    data_object = event["data"]["object"] if isinstance(event, dict) else event["data"]["object"]
+
+    try:
+        if event_type == "customer.subscription.deleted":
+            await _sync_subscription_from_stripe_id(data_object["id"], status_override="cancelled")
+        elif event_type == "customer.subscription.updated":
+            await _sync_subscription_from_stripe_id(data_object["id"])
+        elif event_type == "invoice.payment_failed":
+            sub_id = data_object.get("subscription")
+            if sub_id:
+                await _sync_subscription_from_stripe_id(sub_id, status_override="past_due")
+        elif event_type == "invoice.paid":
+            sub_id = data_object.get("subscription")
+            if sub_id:
+                await _sync_subscription_from_stripe_id(sub_id, status_override="active")
+        else:
+            logger.info(f"Stripe webhook: unhandled event type {event_type}")
+    except Exception as e:
+        logger.error(f"Error processing Stripe webhook event {event_type}: {e}")
+        # Return 200 anyway so Stripe doesn't hammer retries for a local bug;
+        # the error is logged for investigation.
+
+    return {"received": True}
 
 # ============ SUBSCRIPTION ROUTES ============
 

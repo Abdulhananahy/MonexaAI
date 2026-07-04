@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,13 +44,69 @@ export default function TransactionsScreen() {
   const [groupedTransactions, setGroupedTransactions] = useState<GroupedTransactions>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exportEnabled, setExportEnabled] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Reload data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadTransactions();
+      loadExportEntitlement();
     }, [])
   );
+
+  const loadExportEntitlement = async () => {
+    try {
+      const response = await api.get('/subscription/usage');
+      setExportEnabled(!!response.data.export_enabled);
+    } catch (error) {
+      console.error('Failed to load export entitlement:', error);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!exportEnabled) {
+      Alert.alert(
+        'Pro Feature',
+        'CSV export is available on the Pro plan. Upgrade to export your transactions.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/upgrade' as any) },
+        ]
+      );
+      return;
+    }
+
+    setExporting(true);
+    try {
+      if (Platform.OS === 'web') {
+        const response = await api.get('/transactions/export', { responseType: 'blob' });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `monexa_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else {
+        const FileSystem = await import('expo-file-system');
+        const Sharing = await import('expo-sharing');
+        const response = await api.get('/transactions/export');
+        const fileUri = FileSystem.documentDirectory + `monexa_transactions_${Date.now()}.csv`;
+        await FileSystem.writeAsStringAsync(fileUri, response.data, { encoding: FileSystem.EncodingType.UTF8 });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri);
+        } else {
+          Alert.alert('Exported', `CSV saved to ${fileUri}`);
+        }
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      Alert.alert('Error', 'Failed to export transactions');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadTransactions = async () => {
     try {
@@ -137,12 +195,25 @@ export default function TransactionsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Transactions</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => router.push('/add-transaction' as any)}
-        >
-          <Ionicons name="add" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.exportButton}
+            onPress={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <ActivityIndicator size="small" color="#374151" />
+            ) : (
+              <Ionicons name={exportEnabled ? 'download-outline' : 'lock-closed-outline'} size={20} color="#374151" />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => router.push('/add-transaction' as any)}
+          >
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -294,6 +365,19 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: '#D32F2F',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  exportButton: {
+    backgroundColor: '#F3F4F6',
     width: 40,
     height: 40,
     borderRadius: 20,

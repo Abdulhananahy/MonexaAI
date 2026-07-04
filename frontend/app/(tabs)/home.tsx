@@ -22,6 +22,11 @@ interface AnalyticsSummary {
   total_expense: number;
   top_spending_categories: { name: string; amount: number }[];
   transaction_count: number;
+  monthly_budget?: number | null;
+  current_month_expense?: number;
+  budget_percent_used?: number | null;
+  budget_alert?: boolean;
+  budget_alert_threshold?: number;
 }
 
 interface Transaction {
@@ -90,10 +95,26 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>Hello,</Text>
             <Text style={styles.userName}>{user?.full_name}</Text>
           </View>
-          <TouchableOpacity>
-            <Ionicons name="notifications-outline" size={24} color="#1F2937" />
+          <TouchableOpacity onPress={() => router.push('/notifications' as any)}>
+            <View>
+              <Ionicons name="notifications-outline" size={24} color="#1F2937" />
+              {summary?.budget_alert && <View style={styles.notificationDot} />}
+            </View>
           </TouchableOpacity>
         </View>
+
+        {summary?.budget_alert && (
+          <TouchableOpacity
+            style={styles.budgetAlertCard}
+            onPress={() => router.push('/(tabs)/insights' as any)}
+          >
+            <Ionicons name="warning" size={20} color="#B45309" />
+            <Text style={styles.budgetAlertText}>
+              You've used {summary.budget_percent_used}% of your monthly budget
+              {summary.monthly_budget ? ` (${user?.currency || 'USD'} ${formatNumber(summary.monthly_budget)})` : ''}.
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Current Balance</Text>
@@ -320,6 +341,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#D32F2F',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+  budgetAlertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    padding: 14,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  budgetAlertText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    fontWeight: '500',
   },
   section: {
     paddingHorizontal: 24,
