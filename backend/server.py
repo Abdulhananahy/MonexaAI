@@ -1675,6 +1675,23 @@ async def get_stripe_config():
     credentials = await get_stripe_credentials()
     return {"publishable_key": credentials.get("publishable")}
 
+@api_router.get("/subscription/pricing")
+async def get_subscription_pricing(current_user: dict = Depends(get_current_user)):
+    """Return plan prices in USD plus an approximate conversion to the user's currency,
+    so the upgrade screen isn't showing a bare '$' to non-USD users."""
+    user_currency = current_user.get("currency", "USD")
+    plans_usd = {"starter": 3, "pro": 9}
+    converted = {}
+    if user_currency != "USD":
+        rate = await get_exchange_rate("USD", user_currency)
+        for plan_id, usd_price in plans_usd.items():
+            converted[plan_id] = round(usd_price * rate, 2)
+    return {
+        "currency": user_currency,
+        "usd_prices": plans_usd,
+        "converted_prices": converted,
+    }
+
 class CreatePaymentSheetRequest(BaseModel):
     plan_type: str  # "starter" or "pro"
 

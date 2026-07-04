@@ -7,6 +7,7 @@ import api from '../utils/api';
 import { useStripeNative } from '../utils/stripeNative';
 import { COLORS, RADIUS, SHADOW, FONTS } from '../constants/theme';
 import { Mascot } from '../components/Mascot';
+import { getCurrencySymbol, formatNumber } from '../utils/format';
 
 export default function UpgradeScreen() {
   const router = useRouter();
@@ -18,9 +19,12 @@ export default function UpgradeScreen() {
   const [promoCode, setPromoCode] = useState('');
   const [promoValid, setPromoValid] = useState<boolean | null>(null);
   const [promoDiscount, setPromoDiscount] = useState('');
+  const [convertedPrices, setConvertedPrices] = useState<{ starter?: number; pro?: number }>({});
+  const [userCurrency, setUserCurrency] = useState('USD');
 
   useEffect(() => {
     loadStripeConfig();
+    loadPricing();
   }, []);
 
   const loadStripeConfig = async () => {
@@ -30,6 +34,22 @@ export default function UpgradeScreen() {
     } catch (error) {
       console.error('Failed to load Stripe config:', error);
     }
+  };
+
+  const loadPricing = async () => {
+    try {
+      const response = await api.get('/subscription/pricing');
+      setUserCurrency(response.data.currency);
+      setConvertedPrices(response.data.converted_prices || {});
+    } catch (error) {
+      console.error('Failed to load pricing:', error);
+    }
+  };
+
+  const priceSubtext = (planId: 'starter' | 'pro') => {
+    const converted = convertedPrices[planId];
+    if (userCurrency === 'USD' || converted === undefined) return null;
+    return `≈ ${getCurrencySymbol(userCurrency)}${formatNumber(converted)}/mo`;
   };
 
   const tiers = [
@@ -205,6 +225,9 @@ export default function UpgradeScreen() {
                 <View style={styles.priceContainer}>
                   <Text style={styles.price}>{tier.price}</Text>
                   {tier.period && <Text style={styles.period}>{tier.period}</Text>}
+                  {priceSubtext(tier.id) && (
+                    <Text style={styles.priceSubtext}>{priceSubtext(tier.id)}</Text>
+                  )}
                 </View>
               </View>
               <View style={styles.featuresList}>
@@ -414,6 +437,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: FONTS.bodyMedium,
     color: COLORS.inkSoft,
+  },
+  priceSubtext: {
+    fontSize: 12,
+    fontFamily: FONTS.body,
+    color: COLORS.inkSoft,
+    width: '100%',
+    textAlign: 'right',
+    marginTop: 2,
   },
   featuresList: {
     borderTopWidth: 1,

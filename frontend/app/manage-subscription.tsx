@@ -79,15 +79,17 @@ export default function ManageSubscriptionScreen() {
     }
   };
 
+  const cancelWarning = 'Are you sure you want to cancel your subscription? You will lose access to premium features immediately. Cancelling stops future billing but does not refund the current billing period.';
+
   const handleCancel = () => {
     if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to cancel your subscription? You will lose access to premium features immediately.')) {
+      if (window.confirm(cancelWarning)) {
         doCancel();
       }
     } else {
       Alert.alert(
         'Cancel Subscription',
-        'Are you sure you want to cancel your subscription? You will lose access to premium features immediately.',
+        cancelWarning,
         [
           { text: 'Keep Subscription', style: 'cancel' },
           { text: 'Cancel Subscription', style: 'destructive', onPress: doCancel },

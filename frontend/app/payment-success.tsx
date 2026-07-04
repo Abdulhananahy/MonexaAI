@@ -1,17 +1,42 @@
-import { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { COLORS, FONTS, RADIUS, SHADOW } from '../constants/theme';
 import { Mascot } from '../components/Mascot';
+import api from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function PaymentSuccessScreen() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
+  const [checking, setChecking] = useState(true);
+  const [confirmed, setConfirmed] = useState(false);
 
   useEffect(() => {
-    // Optional: Refresh user subscription status
+    confirmSubscription();
   }, []);
+
+  const confirmSubscription = async () => {
+    // The Stripe webhook usually activates the subscription within seconds, but if it's
+    // delayed or missed, poll /subscription/current briefly so the user isn't stuck
+    // believing they're on Pro when the backend still thinks they're on Free.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const { data } = await api.get('/subscription/current');
+        if (data.plan_type !== 'free' && data.status === 'active') {
+          setConfirmed(true);
+          await refreshUser();
+          break;
+        }
+      } catch (error) {
+        console.error('Failed to check subscription status:', error);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    setChecking(false);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -21,9 +46,18 @@ export default function PaymentSuccessScreen() {
         </View>
         
         <Text style={styles.title}>Payment Successful!</Text>
-        <Text style={styles.subtitle}>
-          Welcome to Monexa Pro! Your subscription is now active.
-        </Text>
+        {checking ? (
+          <View style={styles.checkingRow}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+            <Text style={styles.subtitle}>Confirming your subscription...</Text>
+          </View>
+        ) : (
+          <Text style={styles.subtitle}>
+            {confirmed
+              ? 'Welcome to Monexa Pro! Your subscription is now active.'
+              : "Your payment went through. It's taking a little longer than usual to activate — pull to refresh on your Subscription page in a moment, or contact support if it doesn't update."}
+          </Text>
+        )}
 
         <View style={styles.featuresBox}>
           <Text style={styles.featuresTitle}>You now have access to:</Text>
@@ -83,6 +117,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+  },
+  checkingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 32,
   },
   mascotContainer: {
     marginBottom: 24,
